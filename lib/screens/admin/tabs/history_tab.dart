@@ -6,6 +6,7 @@ import '../../../utils/constants.dart';
 import '../../../widgets/admin/info_card.dart';
 import '../../../widgets/admin/status_chip.dart';
 import '../../../models/admin/incident_history.dart';
+import '../incident_detail_page.dart';
 
 /// History tab for admin dashboard
 class HistoryTab extends StatelessWidget {
@@ -226,45 +227,10 @@ class HistoryTab extends StatelessWidget {
   }
 
   void _showDetailedReport(BuildContext context, IncidentHistory incident) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${incident.id} - Detailed Report'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Disaster Type: ${incident.disasterType}'),
-              const SizedBox(height: 8),
-              Text('Severity: ${incident.severityText}'),
-              const SizedBox(height: 8),
-              Text('Status: ${incident.statusText}'),
-              const SizedBox(height: 8),
-              Text('Duration: ${incident.duration}'),
-              const SizedBox(height: 8),
-              Text('Response Time: ${incident.responseTime}'),
-              const SizedBox(height: 8),
-              Text('Affected Count: ${incident.affectedCount}'),
-              const SizedBox(height: 8),
-              Text('Evacuated Count: ${incident.evacuatedCount}'),
-              const SizedBox(height: 8),
-              Text(
-                'Date: ${DateFormat('MMM dd, yyyy HH:mm').format(incident.timestamp)}',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppConstants.primaryColor,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Close'),
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IncidentDetailPage(incident: incident),
       ),
     );
   }
