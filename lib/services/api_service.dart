@@ -1,7 +1,4 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../models/aid_request.dart';
-import '../utils/constants.dart';
 
 /// Service for API communication
 class ApiService {
@@ -9,7 +6,7 @@ class ApiService {
   factory ApiService() => _instance;
   ApiService._internal();
 
-  final String _baseUrl = AppConstants.baseUrl;
+  // Note: this service currently returns mocked responses.
 
   /// Send SOS alert
   Future<ApiResponse<Map<String, dynamic>>> sendSosAlert({
