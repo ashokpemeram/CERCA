@@ -7,6 +7,7 @@ import '../models/admin/incident_history.dart';
 import '../models/admin/safe_camp.dart';
 import '../models/admin/communication_log.dart';
 import '../services/admin_data_service.dart';
+import '../services/simulation_service.dart';
 
 /// System status enumeration
 enum SystemStatus {
@@ -56,6 +57,14 @@ class AdminProvider with ChangeNotifier {
   // Notification count
   int _notificationCount = 0;
   int get notificationCount => _notificationCount;
+
+  // Whether a simulation API call is currently in flight
+  bool _isSimulating = false;
+  bool get isSimulating => _isSimulating;
+
+  // Last simulation result message (success or fallback)
+  String? _lastSimulationMessage;
+  String? get lastSimulationMessage => _lastSimulationMessage;
 
   /// Initialize provider with mock data
   AdminProvider() {
@@ -143,6 +152,77 @@ class AdminProvider with ChangeNotifier {
       _systemStatus = SystemStatus.normal;
     }
 
+    _updateNotificationCount();
+    notifyListeners();
+  }
+
+  /// Trigger a simulation by calling the FastAPI backend.
+  ///
+  /// Sends a POST to `/simulate` with the [disasterType]. On a successful
+  /// response the scenario is built from the API data; if the server is
+  /// unreachable the app gracefully falls back to [loadDummyScenario].
+  Future<void> runSimulation(String disasterType) async {
+    _isSimulating = true;
+    _lastSimulationMessage = null;
+    notifyListeners();
+
+    final result = await SimulationService().triggerSimulation(disasterType);
+
+    if (result.success) {
+      // ── Build scenario from API response ──────────────────────────────
+      _agentStatuses = AdminDataService.getAgentStatuses();
+      _sensorReadings = AdminDataService.getSensorReadings();
+      _sosRequests = AdminDataService.getSosRequests();
+      _aidRequests = AdminDataService.getAidRequests();
+      _communicationLogs = AdminDataService.getCommunicationLogs();
+      _safeCamps = AdminDataService.getSafeCamps();
+      _currentDisasterType = result.disasterType;
+
+      // Map severity string from API to enum
+      IncidentSeverity severity;
+      switch (result.severity?.toLowerCase()) {
+        case 'critical':
+          severity = IncidentSeverity.critical;
+          break;
+        case 'high':
+          severity = IncidentSeverity.high;
+          break;
+        default:
+          severity = IncidentSeverity.medium;
+      }
+
+      final now = DateTime.now();
+      _incidentHistory = [
+        IncidentHistory(
+          id: 'API-${now.millisecondsSinceEpoch}',
+          severity: severity,
+          status: IncidentStatus.ongoing,
+          disasterType: result.disasterType,
+          duration: 'Ongoing',
+          responseTime: result.responseTime ?? 'TBD',
+          affectedCount: result.affectedCount ?? 0,
+          evacuatedCount: result.evacuatedCount ?? 0,
+          timestamp: now,
+        ),
+        ...AdminDataService.getIncidentHistory(),
+      ];
+
+      _systemStatus = severity == IncidentSeverity.critical
+          ? SystemStatus.critical
+          : severity == IncidentSeverity.high
+              ? SystemStatus.degraded
+              : SystemStatus.normal;
+
+      _lastSimulationMessage =
+          '${result.disasterType} simulation initiated via FastAPI';
+    } else {
+      // ── Fallback: use mock data ────────────────────────────────────────
+      loadDummyScenario(disasterType);
+      _lastSimulationMessage =
+          '$disasterType simulation initiated (offline mode)';
+    }
+
+    _isSimulating = false;
     _updateNotificationCount();
     notifyListeners();
   }

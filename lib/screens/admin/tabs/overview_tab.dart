@@ -93,7 +93,18 @@ class _OverviewTabState extends State<OverviewTab> {
                           ),
                         ),
                         const Spacer(),
-                        ElevatedButton.icon(
+                        // Show a spinner while the simulation API call is in flight
+                        if (adminProvider.isSimulating)
+                          const SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        else
+                          ElevatedButton.icon(
                           onPressed: () => _showSimulationDialog(context, adminProvider),
                           icon: const Icon(Icons.play_arrow, size: 14),
                           label: const Text(
@@ -786,19 +797,29 @@ class _OverviewTabState extends State<OverviewTab> {
     Color color,
   ) {
     return InkWell(
-      onTap: () {
-        adminProvider.loadDummyScenario(disasterType);
+      onTap: () async {
+        // Dismiss the dialog immediately so the user can see the loading state
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$disasterType simulation initiated'),
-            backgroundColor: color,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+
+        // Kick off the async FastAPI call (provider's isSimulating becomes true)
+        await adminProvider.runSimulation(disasterType);
+
+        // Show outcome snackbar once the call completes.
+        // Use a mounted-safe guard — the widget might have been disposed.
+        if (context.mounted) {
+          final message = adminProvider.lastSimulationMessage ??
+              '$disasterType simulation initiated';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: color,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ),
-        );
+          );
+        }
       },
       child: Container(
         padding: const EdgeInsets.all(12),
