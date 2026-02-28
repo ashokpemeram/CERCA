@@ -1,10 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/admin_provider.dart';
-import '../../../providers/assessment_provider.dart';
-import '../../../providers/location_provider.dart';
-import '../../../models/assessment_result.dart';
 import '../../../utils/constants.dart';
 import '../../../widgets/admin/info_card.dart';
 import '../../../widgets/admin/metric_card.dart';
@@ -20,98 +16,612 @@ class OverviewTab extends StatefulWidget {
 }
 
 class _OverviewTabState extends State<OverviewTab> {
-  bool _hasAutoAssessed = false;
-  Timer? _assessmentTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Re-assess every 60 seconds
-    _assessmentTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      final locationProvider = context.read<LocationProvider>();
-      final lat = locationProvider.latitude;
-      final lon = locationProvider.longitude;
-      if (lat != null && lon != null) {
-        context.read<AssessmentProvider>().assessByCoordinates(lat, lon);
-      }
-    });
-  }
+  // Controllers for each resource type
+  final TextEditingController _ambulancesController = TextEditingController();
+  final TextEditingController _boatsController = TextEditingController();
+  final TextEditingController _foodPacketsController = TextEditingController();
+  final TextEditingController _medicalKitsController = TextEditingController();
 
   @override
   void dispose() {
-    _assessmentTimer?.cancel();
+    _ambulancesController.dispose();
+    _boatsController.dispose();
+    _foodPacketsController.dispose();
+    _medicalKitsController.dispose();
     super.dispose();
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Auto-trigger assessment once when location is available
-    if (!_hasAutoAssessed) {
-      final locationProvider = context.read<LocationProvider>();
-      final lat = locationProvider.latitude;
-      final lon = locationProvider.longitude;
-      if (lat != null && lon != null) {
-        _hasAutoAssessed = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          context.read<AssessmentProvider>().assessByCoordinates(lat, lon);
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Consumer2<AdminProvider, AssessmentProvider>(
-      builder: (context, adminProvider, assessmentProvider, child) {
+    return Consumer<AdminProvider>(
+      builder: (context, adminProvider, child) {
         return SingleChildScrollView(
           padding: const EdgeInsets.all(AppConstants.paddingMedium),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ── AI Risk Assessment Card ─────────────────────────────────
-              _buildAssessRiskCard(context, assessmentProvider),
-              const SizedBox(height: 20),
-
-              // ── Agent Health Monitor ────────────────────────────────────
-              Text('Agent Health Monitor', style: AppConstants.subheadingStyle),
-              const SizedBox(height: 12),
-              ...adminProvider.agentStatuses.map(
-                (agent) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: AgentStatusCard(
-                    agentName: agent.name,
-                    status: agent.status,
+              // System Status Banner
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: adminProvider.systemStatus == SystemStatus.normal
+                        ? [Colors.green[700]!, Colors.green[900]!]
+                        : [Colors.red[700]!, Colors.red[900]!],
                   ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color:
+                                adminProvider.systemStatus ==
+                                    SystemStatus.normal
+                                ? Colors.green[300]
+                                : Colors.red[300],
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    (adminProvider.systemStatus ==
+                                                SystemStatus.normal
+                                            ? Colors.green[300]
+                                            : Colors.red[300])!
+                                        .withOpacity(0.8),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'SYSTEM STATUS',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                        const Spacer(),
+                        ElevatedButton.icon(
+                          onPressed: () =>
+                              _showSimulationDialog(context, adminProvider),
+                          icon: const Icon(Icons.play_arrow, size: 14),
+                          label: const Text(
+                            'SIMULATE',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      adminProvider.systemStatusText.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    if (adminProvider.systemStatus != SystemStatus.normal) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${adminProvider.currentDisasterType?.toUpperCase() ?? 'DISASTER'} PROTOCOL ACTIVE • Response Teams Deployed',
+                        style: TextStyle(
+                          color:
+                              adminProvider.systemStatus == SystemStatus.normal
+                              ? Colors.green[200]
+                              : Colors.red[200],
+                          fontSize: 10,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const SizedBox(height: 20),
 
-              // ── Live Sensor Readings ────────────────────────────────────
-              Text('Live Sensor Readings', style: AppConstants.subheadingStyle),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.1,
+              // Agent Health Monitor
+              InfoCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.speed,
+                          size: 16,
+                          color: AppConstants.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'AGENT HEALTH MONITOR',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[800],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ...adminProvider.agentStatuses.map(
+                      (agent) => Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: AgentStatusCard(
+                          agentName: agent.name,
+                          status: agent.status,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                itemCount: adminProvider.sensorReadings.length,
-                itemBuilder: (context, index) {
-                  final sensor = adminProvider.sensorReadings[index];
-                  return MetricCard(
-                    title: sensor.type,
-                    value: sensor.formattedValue,
-                    icon: _getSensorIcon(sensor.type),
-                    iconColor: _getSensorColor(sensor.type),
-                    statusText: sensor.trendText,
-                    trendIcon: _getTrendIcon(sensor.trend),
-                    trendColor: _getTrendColor(sensor.trend),
-                  );
-                },
+              ),
+              const SizedBox(height: 20),
+
+              // Live Sensor Readings
+              InfoCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.visibility,
+                          size: 16,
+                          color: AppConstants.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'LIVE SENSOR READINGS',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[800],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 1.1,
+                          ),
+                      itemCount: adminProvider.sensorReadings.length,
+                      itemBuilder: (context, index) {
+                        final sensor = adminProvider.sensorReadings[index];
+                        return MetricCard(
+                          title: sensor.type,
+                          value: sensor.formattedValue,
+                          icon: _getSensorIcon(sensor.type),
+                          iconColor: _getSensorColor(sensor.type),
+                          statusText: sensor.trendText,
+                          trendIcon: _getTrendIcon(sensor.trend),
+                          trendColor: _getTrendColor(sensor.trend),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Decision Agent - Logistics Control
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.purple[50]!, Colors.blue[50]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.purple[300]!, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.purple.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.purple[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.psychology,
+                            size: 16,
+                            color: Colors.purple[700],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'DECISION AGENT - LOGISTICS CONTROL',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'AI-powered resource allocation based on real-time data',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (adminProvider.systemStatus == SystemStatus.normal)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'No active incident. Use SIMULATE to run a scenario and see live decision updates.',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.blue[900],
+                          ),
+                        ),
+                      ),
+                    if (adminProvider.systemStatus == SystemStatus.normal)
+                      const SizedBox(height: 12),
+
+                    // AI Recommendations Display
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border(
+                          left: BorderSide(
+                            color: Colors.purple[600]!,
+                            width: 4,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.auto_awesome,
+                                  size: 14,
+                                  color: Colors.purple[700],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'AI RESOURCE RECOMMENDATIONS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[700],
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Display AI suggestions in grid
+                          GridView.count(
+                            crossAxisCount: 2,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 2.5,
+                            children: [
+                              _buildAiSuggestionChip(
+                                'Ambulances',
+                                adminProvider.aiSuggestions['ambulances']
+                                        ?.toString() ??
+                                    '12',
+                              ),
+                              _buildAiSuggestionChip(
+                                'Rescue Boats',
+                                adminProvider.aiSuggestions['boats']
+                                        ?.toString() ??
+                                    '8',
+                              ),
+                              _buildAiSuggestionChip(
+                                'Food Packets',
+                                adminProvider.aiSuggestions['foodPackets']
+                                        ?.toString() ??
+                                    '5000',
+                              ),
+                              _buildAiSuggestionChip(
+                                'Medical Kits',
+                                adminProvider.aiSuggestions['medicalKits']
+                                        ?.toString() ??
+                                    '200',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 12,
+                                  color: Colors.blue[700],
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Based on: ${adminProvider.sosAlertsCount} SOS alerts, ${adminProvider.aidRequestsCount} aid requests, weather data, and map analysis',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.blue[900],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Admin Override Section
+                    Row(
+                      children: [
+                        Icon(Icons.settings, size: 12, color: Colors.grey[700]),
+                        const SizedBox(width: 6),
+                        Text(
+                          'ADMIN OVERRIDE (Edit to modify AI suggestions)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Override Input Fields
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 2.0,
+                      children: [
+                        _buildOverrideField(
+                          'Ambulances',
+                          _ambulancesController,
+                          adminProvider.aiSuggestions['ambulances']
+                                  ?.toString() ??
+                              '12',
+                        ),
+                        _buildOverrideField(
+                          'Rescue Boats',
+                          _boatsController,
+                          adminProvider.aiSuggestions['boats']?.toString() ??
+                              '8',
+                        ),
+                        _buildOverrideField(
+                          'Food Packets',
+                          _foodPacketsController,
+                          adminProvider.aiSuggestions['foodPackets']
+                                  ?.toString() ??
+                              '5000',
+                        ),
+                        _buildOverrideField(
+                          'Medical Kits',
+                          _medicalKitsController,
+                          adminProvider.aiSuggestions['medicalKits']
+                                  ?.toString() ??
+                              '200',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Apply Button
+                    ElevatedButton(
+                      onPressed: () =>
+                          _applyDecisionOverrides(context, adminProvider),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple[600],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.check_circle, size: 16),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'APPLY OVERRIDES & RECALCULATE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Warning Note
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.yellow[50],
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border(
+                          left: BorderSide(
+                            color: Colors.yellow[700]!,
+                            width: 4,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 14,
+                            color: Colors.yellow[800],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Note: System will recalculate resource gaps and suggest backup plans. Your override decisions are logged for learning.',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.yellow[900],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Audit Trail (if exists)
+                    if (adminProvider.decisionAudit.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'RECENT DECISIONS',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...adminProvider.decisionAudit
+                          .take(3)
+                          .map(
+                            (audit) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 4),
+                                    width: 4,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple[400],
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      audit,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -120,353 +630,25 @@ class _OverviewTabState extends State<OverviewTab> {
     );
   }
 
-  Widget _buildAssessRiskCard(
-      BuildContext context, AssessmentProvider provider) {
-    final locationProvider = context.watch<LocationProvider>();
-    final lat = locationProvider.latitude;
-    final lon = locationProvider.longitude;
-    final hasLocation = lat != null && lon != null;
-
-    return InfoCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // ── Header ──
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppConstants.primaryColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.shield_outlined,
-                    color: AppConstants.primaryColor, size: 24),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'AI Disaster Risk Assessment',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF212121),
-                      ),
-                    ),
-                    Text(
-                      'Powered by WeatherAPI · NewsAPI · GPT-4o-mini',
-                      style: TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-
-          // ── Location Chip ──
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: hasLocation
-                  ? AppConstants.safeColor.withOpacity(0.08)
-                  : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-              border: Border.all(
-                color: hasLocation
-                    ? AppConstants.safeColor.withOpacity(0.4)
-                    : Colors.grey.shade300,
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.my_location,
-                  size: 16,
-                  color: hasLocation
-                      ? AppConstants.safeColor
-                      : Colors.grey.shade500,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    hasLocation
-                        ? 'Using your GPS location  (${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)})'
-                        : 'Waiting for GPS location...',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: hasLocation
-                          ? AppConstants.safeColor
-                          : Colors.grey.shade500,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                // Refresh button
-                if (hasLocation)
-                  InkWell(
-                    onTap: provider.isLoading
-                        ? null
-                        : () => provider.assessByCoordinates(lat, lon),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4),
-                      child: provider.isLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppConstants.primaryColor,
-                              ),
-                            )
-                          : const Icon(Icons.refresh,
-                              size: 18, color: AppConstants.primaryColor),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          // ── Loading State ──
-          if (provider.isLoading) ...[
-            const SizedBox(height: 20),
-            const Center(
-              child: Column(
-                children: [
-                  CircularProgressIndicator(color: AppConstants.primaryColor),
-                  SizedBox(height: 12),
-                  Text(
-                    'Analysing weather, news & risk...',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          // ── No Location ──
-          if (!hasLocation && !provider.isLoading && provider.result == null) ...[
-            const SizedBox(height: 16),
-            Center(
-              child: Column(
-                children: [
-                  Icon(Icons.location_off, color: Colors.grey.shade400, size: 40),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Location not available.\nPlease grant location permission.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // ── Error ──
-          if (provider.errorMessage != null && !provider.isLoading) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius:
-                    BorderRadius.circular(AppConstants.borderRadiusMedium),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      provider.errorMessage!,
-                      style:
-                          TextStyle(color: Colors.red.shade700, fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // ── Result Card ──
-          if (provider.result != null && !provider.isLoading) ...[
-            const SizedBox(height: 16),
-            _buildResultCard(provider.result!),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResultCard(AssessmentResult result) {
-    final riskColor = _riskColor(result.overallRisk);
-    final riskIcon = _riskIcon(result.overallRisk);
-
+  Widget _buildAiSuggestionChip(String label, String value) {
     return Container(
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: riskColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(AppConstants.borderRadiusMedium),
-        border: Border.all(color: riskColor.withOpacity(0.4), width: 1.5),
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Risk banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: riskColor,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(10),
-                topRight: Radius.circular(10),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(riskIcon, color: Colors.white, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        result.location.isNotEmpty
-                            ? result.location.toUpperCase()
-                            : 'YOUR LOCATION',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 11,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      Text(
-                        '${result.overallRisk.toUpperCase()} RISK',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Details
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Weather
-                if (result.temperatureC != null ||
-                    result.weatherCondition != null) ...[
-                  _sectionLabel('Weather', Icons.wb_sunny_outlined),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      if (result.temperatureC != null)
-                        _chip('${result.temperatureC!.toStringAsFixed(1)}°C',
-                            Icons.thermostat, Colors.orange),
-                      if (result.windKph != null)
-                        _chip('${result.windKph!.toStringAsFixed(0)} km/h',
-                            Icons.air, Colors.blue),
-                      if (result.weatherCondition != null)
-                        _chip(result.weatherCondition!, Icons.cloud,
-                            Colors.blueGrey),
-                      if (result.weatherRiskLevel != null)
-                        _chip('Weather: ${result.weatherRiskLevel!}',
-                            Icons.warning_amber_outlined,
-                            _riskColor(result.weatherRiskLevel!)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                ],
-
-                // News
-                _sectionLabel('News Analysis', Icons.newspaper),
-                const SizedBox(height: 6),
-                _chip('News risk: ${result.newsRiskLevel ?? 'low'}',
-                    Icons.assessment_outlined,
-                    _riskColor(result.newsRiskLevel ?? 'low')),
-                if (result.newsEvents.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  ...result.newsEvents.take(3).map(
-                        (e) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Icon(Icons.circle,
-                                  size: 6, color: Colors.grey.shade500),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(e,
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        color: Color(0xFF616161))),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                ] else ...[
-                  const SizedBox(height: 4),
-                  const Text('No disaster-related news detected.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-
-                // GPT-4o-mini alert
-                if (result.alertMessage != null) ...[
-                  const SizedBox(height: 14),
-                  _sectionLabel('AI Alert Message', Icons.smart_toy_outlined),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: riskColor.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: riskColor.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      result.alertMessage!,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF212121),
-                          height: 1.5),
-                    ),
-                  ),
-                ],
-
-                // Safe message
-                if (result.safeMessage != null) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle,
-                          color: AppConstants.safeColor, size: 18),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(result.safeMessage!,
-                            style: const TextStyle(
-                                color: AppConstants.safeColor,
-                                fontWeight: FontWeight.w600)),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
+          Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[600])),
+          const SizedBox(height: 2),
+          Text(
+            '$value units',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[800],
             ),
           ),
         ],
@@ -474,64 +656,249 @@ class _OverviewTabState extends State<OverviewTab> {
     );
   }
 
-  Widget _sectionLabel(String text, IconData icon) {
-    return Row(
+  Widget _buildOverrideField(
+    String label,
+    TextEditingController controller,
+    String placeholder,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 14, color: Colors.grey.shade600),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey.shade700,
-              letterSpacing: 0.5),
+        Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[600])),
+        const SizedBox(height: 4),
+        TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          decoration: InputDecoration(
+            hintText: placeholder,
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 12),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide: BorderSide(color: Colors.purple[400]!, width: 2),
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _chip(String label, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12, color: color, fontWeight: FontWeight.w500)),
-        ],
+  void _showSimulationDialog(
+    BuildContext context,
+    AdminProvider adminProvider,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.grey[800]!, Colors.grey[900]!],
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: const Column(
+                children: [
+                  Text(
+                    'INITIATE SIMULATION',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Select disaster scenario for demo',
+                    style: TextStyle(fontSize: 11, color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildSimulationOption(
+                    context,
+                    adminProvider,
+                    'Coastal Flood',
+                    Icons.waves,
+                    Colors.blue,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSimulationOption(
+                    context,
+                    adminProvider,
+                    'Cyclone',
+                    Icons.air,
+                    Colors.purple,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSimulationOption(
+                    context,
+                    adminProvider,
+                    'Earthquake',
+                    Icons.landscape,
+                    Colors.brown,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSimulationOption(
+                    context,
+                    adminProvider,
+                    'Forest Fire',
+                    Icons.local_fire_department,
+                    Colors.orange,
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 40),
+                      side: BorderSide(color: Colors.grey[400]!),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Color _riskColor(String risk) {
-    switch (risk.toLowerCase()) {
-      case 'high':
-        return AppConstants.dangerColor;
-      case 'medium':
-        return AppConstants.warningColor;
-      default:
-        return AppConstants.safeColor;
-    }
+  Widget _buildSimulationOption(
+    BuildContext context,
+    AdminProvider adminProvider,
+    String disasterType,
+    IconData icon,
+    Color color,
+  ) {
+    return InkWell(
+      onTap: () {
+        adminProvider.loadDummyScenario(disasterType);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$disasterType simulation initiated'),
+            backgroundColor: color,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey[300]!),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              disasterType.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  IconData _riskIcon(String risk) {
-    switch (risk.toLowerCase()) {
-      case 'high':
-        return Icons.warning_amber_rounded;
-      case 'medium':
-        return Icons.warning_outlined;
-      default:
-        return Icons.check_circle_outline;
+  void _applyDecisionOverrides(
+    BuildContext context,
+    AdminProvider adminProvider,
+  ) {
+    // Collect override values
+    final overrides = <String, int>{};
+
+    if (_ambulancesController.text.isNotEmpty) {
+      overrides['ambulances'] = int.tryParse(_ambulancesController.text) ?? 0;
     }
+    if (_boatsController.text.isNotEmpty) {
+      overrides['boats'] = int.tryParse(_boatsController.text) ?? 0;
+    }
+    if (_foodPacketsController.text.isNotEmpty) {
+      overrides['foodPackets'] = int.tryParse(_foodPacketsController.text) ?? 0;
+    }
+    if (_medicalKitsController.text.isNotEmpty) {
+      overrides['medicalKits'] = int.tryParse(_medicalKitsController.text) ?? 0;
+    }
+
+    if (overrides.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No changes detected. Please modify at least one resource allocation.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Apply overrides through provider
+    // This will:
+    // 1. Store override in Redis for learning
+    // 2. Recalculate resource gaps
+    // 3. Update AI suggestions based on new data + past overrides
+    // 4. Create audit trail
+    adminProvider.applyResourceOverrides(overrides);
+
+    // Clear controllers
+    _ambulancesController.clear();
+    _boatsController.clear();
+    _foodPacketsController.clear();
+    _medicalKitsController.clear();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Decision overrides applied. System recalculating resource allocation and gap analysis.',
+        ),
+        backgroundColor: Colors.purple[600],
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   IconData _getSensorIcon(String type) {
