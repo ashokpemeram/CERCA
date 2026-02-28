@@ -6,6 +6,7 @@ import '../../../utils/constants.dart';
 import '../../../widgets/admin/info_card.dart';
 import '../../../widgets/admin/status_chip.dart';
 import '../../../models/admin/incident_history.dart';
+import '../../../services/incident_report_service.dart';
 import '../incident_detail_page.dart';
 
 /// History tab for admin dashboard
@@ -133,23 +134,40 @@ class HistoryTab extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
 
-                          // View Report Button
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: () => _showDetailedReport(
-                                context,
-                                incident,
-                              ),
-                              icon: const Icon(Icons.description),
-                              label: const Text('VIEW DETAILED REPORT'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: AppConstants.primaryColor,
-                                side: const BorderSide(
-                                  color: AppConstants.primaryColor,
+                          // View + Download Buttons
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () =>
+                                      _showDetailedReport(context, incident),
+                                  icon: const Icon(Icons.description),
+                                  label: const Text('DETAILS'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppConstants.primaryColor,
+                                    side: const BorderSide(
+                                      color: AppConstants.primaryColor,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () =>
+                                      IncidentReportService.downloadReport(
+                                        context,
+                                        incident,
+                                      ),
+                                  icon: const Icon(Icons.download, size: 18),
+                                  label: const Text('DOWNLOAD'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppConstants.primaryColor,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -164,9 +182,7 @@ class HistoryTab extends StatelessWidget {
               padding: const EdgeInsets.all(AppConstants.paddingMedium),
               decoration: BoxDecoration(
                 color: Colors.grey[200],
-                border: Border(
-                  top: BorderSide(color: Colors.grey[300]!),
-                ),
+                border: Border(top: BorderSide(color: Colors.grey[300]!)),
               ),
               child: Text(
                 'Total Sessions: ${adminProvider.totalSessions}',
@@ -216,10 +232,7 @@ class HistoryTab extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -229,9 +242,7 @@ class HistoryTab extends StatelessWidget {
   void _showDetailedReport(BuildContext context, IncidentHistory incident) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => IncidentDetailPage(incident: incident),
-      ),
+      MaterialPageRoute(builder: (_) => IncidentDetailPage(incident: incident)),
     );
   }
 }

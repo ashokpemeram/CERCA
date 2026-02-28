@@ -1,10 +1,7 @@
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/admin/incident_history.dart';
+import '../../services/incident_report_service.dart';
 import '../../utils/constants.dart';
 
 /// Page that shows detailed incident information and allows downloading a report.
@@ -12,51 +9,6 @@ class IncidentDetailPage extends StatelessWidget {
   final IncidentHistory incident;
 
   const IncidentDetailPage({super.key, required this.incident});
-
-  String _buildReportText() {
-    final buffer = StringBuffer();
-    buffer.writeln('Incident Report - ${incident.id}');
-    buffer.writeln('Generated: ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}');
-    buffer.writeln('');
-    buffer.writeln('Disaster Type: ${incident.disasterType}');
-    buffer.writeln('Severity: ${incident.severityText}');
-    buffer.writeln('Status: ${incident.statusText}');
-    buffer.writeln('Date: ${DateFormat('MMM dd, yyyy HH:mm').format(incident.timestamp)}');
-    buffer.writeln('Duration: ${incident.duration}');
-    buffer.writeln('Response Time: ${incident.responseTime}');
-    buffer.writeln('Affected Population: ${incident.affectedCount}');
-    buffer.writeln('Evacuated: ${incident.evacuatedCount}');
-    buffer.writeln('');
-    buffer.writeln('Raw JSON:');
-    buffer.writeln(incident.toJson().toString());
-    return buffer.toString();
-  }
-
-  Future<void> _downloadReport(BuildContext context) async {
-    try {
-      final text = _buildReportText();
-
-      // Write to a temporary file and open the native share sheet so user can save/download
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/${incident.id}_report.txt');
-      await file.writeAsString(text);
-
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Incident Report - ${incident.id}',
-        subject: 'Incident Report - ${incident.id}',
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save report: $e'),
-            backgroundColor: AppConstants.dangerColor,
-          ),
-        );
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +32,10 @@ class IncidentDetailPage extends StatelessWidget {
                     children: [
                       const Icon(Icons.arrow_back, color: Colors.blue),
                       const SizedBox(width: 8),
-                      Text('Back to History', style: TextStyle(color: Colors.blue[700])),
+                      Text(
+                        'Back to History',
+                        style: TextStyle(color: Colors.blue[700]),
+                      ),
                     ],
                   ),
                 ),
@@ -89,7 +44,9 @@ class IncidentDetailPage extends StatelessWidget {
               // Main incident card
               Card(
                 elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -98,48 +55,84 @@ class IncidentDetailPage extends StatelessWidget {
                       Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: AppConstants.primaryColor.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text(incident.id, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            child: Text(
+                              incident.id,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 8),
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
-                              color: incident.severity == IncidentSeverity.critical
+                              color:
+                                  incident.severity == IncidentSeverity.critical
                                   ? AppConstants.dangerColor
                                   : incident.severity == IncidentSeverity.high
-                                      ? AppConstants.mediumRiskColor
-                                      : Colors.blueGrey,
+                                  ? AppConstants.mediumRiskColor
+                                  : Colors.blueGrey,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               incident.severityText.toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Text(incident.disasterType, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text(
+                        incident.disasterType,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       Text(
-                        DateFormat('yyyy-MM-dd • hh:mm a').format(incident.timestamp),
+                        DateFormat(
+                          'yyyy-MM-dd • hh:mm a',
+                        ).format(incident.timestamp),
                         style: TextStyle(color: Colors.grey[700]),
                       ),
                       const SizedBox(height: 12),
                       const Divider(),
                       const SizedBox(height: 8),
-                      Text('AFFECTED AREA', style: AppConstants.captionStyle.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        'AFFECTED AREA',
+                        style: AppConstants.captionStyle.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 8),
-                      Text('Coastal District A, Sectors 3-7', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(
+                        'Coastal District A, Sectors 3-7',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 12),
                       // Impact statistics grid
-                      Text('IMPACT STATISTICS', style: AppConstants.captionStyle.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        'IMPACT STATISTICS',
+                        style: AppConstants.captionStyle.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       GridView.count(
                         crossAxisCount: 2,
@@ -148,14 +141,39 @@ class IncidentDetailPage extends StatelessWidget {
                         mainAxisSpacing: 8,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
-                          _metricCard('Affected Population', '${incident.affectedCount}', Colors.blue[50]!, Colors.blue),
-                          _metricCard('Evacuated', '${incident.evacuatedCount}', Colors.green[50]!, Colors.green[700]!),
-                          _metricCard('Casualties', '—', Colors.red[50]!, AppConstants.dangerColor),
-                          _metricCard('Injured', '—', Colors.orange[50]!, Colors.deepOrange),
+                          _metricCard(
+                            'Affected Population',
+                            '${incident.affectedCount}',
+                            Colors.blue[50]!,
+                            Colors.blue,
+                          ),
+                          _metricCard(
+                            'Evacuated',
+                            '${incident.evacuatedCount}',
+                            Colors.green[50]!,
+                            Colors.green[700]!,
+                          ),
+                          _metricCard(
+                            'Casualties',
+                            '—',
+                            Colors.red[50]!,
+                            AppConstants.dangerColor,
+                          ),
+                          _metricCard(
+                            'Injured',
+                            '—',
+                            Colors.orange[50]!,
+                            Colors.deepOrange,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Text('RESOURCES DEPLOYED', style: AppConstants.captionStyle.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        'RESOURCES DEPLOYED',
+                        style: AppConstants.captionStyle.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 8),
                       GridView.count(
                         crossAxisCount: 2,
@@ -185,9 +203,14 @@ class IncidentDetailPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('AI & ADMIN DECISIONS', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const Text(
+                        'AI & ADMIN DECISIONS',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 8),
-                      const Text('1. Auto-evacuation advised for coastal sectors 3-7.'),
+                      const Text(
+                        '1. Auto-evacuation advised for coastal sectors 3-7.',
+                      ),
                       const SizedBox(height: 6),
                       const Text('2. Medical teams deployed to sector 5.'),
                     ],
@@ -197,7 +220,8 @@ class IncidentDetailPage extends StatelessWidget {
 
               const SizedBox(height: 16),
               ElevatedButton.icon(
-                onPressed: () => _downloadReport(context),
+                onPressed: () =>
+                    IncidentReportService.downloadReport(context, incident),
                 icon: const Icon(Icons.download),
                 label: const Text('Download Report'),
                 style: ElevatedButton.styleFrom(
@@ -225,7 +249,14 @@ class IncidentDetailPage extends StatelessWidget {
         children: [
           Text(label, style: AppConstants.captionStyle.copyWith(fontSize: 12)),
           const SizedBox(height: 6),
-          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: accent)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: accent,
+            ),
+          ),
         ],
       ),
     );

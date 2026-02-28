@@ -69,7 +69,8 @@ class MapTab extends StatelessWidget {
                           ),
                         ),
                         ElevatedButton.icon(
-                          onPressed: () => _showAddCampDialog(context, adminProvider),
+                          onPressed: () =>
+                              _showAddCampDialog(context, adminProvider),
                           icon: const Icon(Icons.add_location, size: 16),
                           label: const Text(
                             'ADD CAMP',
@@ -103,13 +104,22 @@ class MapTab extends StatelessWidget {
               child: Stack(
                 children: [
                   FlutterMap(
-                    options: const MapOptions(
+                    options: MapOptions(
                       initialCenter: LatLng(19.0760, 72.8777),
                       initialZoom: 12.0,
+                      onLongPress: (tapPosition, point) {
+                        _showAddCampDialog(
+                          context,
+                          adminProvider,
+                          initialLatitude: point.latitude,
+                          initialLongitude: point.longitude,
+                        );
+                      },
                     ),
                     children: [
                       TileLayer(
-                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        urlTemplate:
+                            'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         userAgentPackageName: 'com.cerca.app',
                       ),
                       // Zone Circles (danger and safe zones)
@@ -118,7 +128,11 @@ class MapTab extends StatelessWidget {
                       ),
                       // Markers (safe camps and zone centers)
                       MarkerLayer(
-                        markers: _buildMarkers(adminProvider, zoneProvider.zones),
+                        markers: _buildMarkers(
+                          context,
+                          adminProvider,
+                          zoneProvider.zones,
+                        ),
                       ),
                     ],
                   ),
@@ -151,11 +165,28 @@ class MapTab extends StatelessWidget {
                             spacing: 12,
                             runSpacing: 6,
                             children: [
-                              _buildLegendItem('High Hazard', AppConstants.dangerColor),
-                              _buildLegendItem('Moderate', AppConstants.mediumRiskColor),
-                              _buildLegendItem('Safe Camp', AppConstants.safeColor),
+                              _buildLegendItem(
+                                'High Hazard',
+                                AppConstants.dangerColor,
+                              ),
+                              _buildLegendItem(
+                                'Moderate',
+                                AppConstants.mediumRiskColor,
+                              ),
+                              _buildLegendItem(
+                                'Safe Camp',
+                                AppConstants.safeColor,
+                              ),
                               _buildLegendItem('Control Center', Colors.blue),
                             ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Long-press map to add a safe camp.',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 10,
+                            ),
                           ),
                         ],
                       ),
@@ -228,7 +259,9 @@ class MapTab extends StatelessWidget {
                               ),
                             )
                           : ListView.builder(
-                              padding: const EdgeInsets.all(AppConstants.paddingMedium),
+                              padding: const EdgeInsets.all(
+                                AppConstants.paddingMedium,
+                              ),
                               itemCount: adminProvider.safeCamps.length,
                               itemBuilder: (context, index) {
                                 final camp = adminProvider.safeCamps[index];
@@ -249,23 +282,30 @@ class MapTab extends StatelessWidget {
                                         children: [
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Row(
                                                   children: [
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 4,
-                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
                                                       decoration: BoxDecoration(
-                                                        color: AppConstants.safeColor,
-                                                        borderRadius: BorderRadius.circular(4),
+                                                        color: AppConstants
+                                                            .safeColor,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              4,
+                                                            ),
                                                       ),
                                                       child: Text(
                                                         camp.id,
                                                         style: const TextStyle(
-                                                          fontWeight: FontWeight.bold,
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                           fontSize: 10,
                                                           color: Colors.white,
                                                           letterSpacing: 0.5,
@@ -274,20 +314,29 @@ class MapTab extends StatelessWidget {
                                                     ),
                                                     const SizedBox(width: 8),
                                                     Container(
-                                                      padding: const EdgeInsets.symmetric(
-                                                        horizontal: 8,
-                                                        vertical: 4,
-                                                      ),
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 8,
+                                                            vertical: 4,
+                                                          ),
                                                       decoration: BoxDecoration(
-                                                        color: AppConstants.safeColor.withOpacity(0.1),
-                                                        borderRadius: BorderRadius.circular(4),
+                                                        color: AppConstants
+                                                            .safeColor
+                                                            .withOpacity(0.1),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              4,
+                                                            ),
                                                       ),
                                                       child: Text(
-                                                        camp.statusText.toUpperCase(),
+                                                        camp.statusText
+                                                            .toUpperCase(),
                                                         style: TextStyle(
-                                                          fontWeight: FontWeight.bold,
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                           fontSize: 10,
-                                                          color: AppConstants.safeColor,
+                                                          color: AppConstants
+                                                              .safeColor,
                                                           letterSpacing: 0.5,
                                                         ),
                                                       ),
@@ -377,18 +426,12 @@ class MapTab extends StatelessWidget {
         Container(
           width: 12,
           height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 10,
-          ),
+          style: const TextStyle(color: Colors.white70, fontSize: 10),
         ),
       ],
     );
@@ -398,17 +441,25 @@ class MapTab extends StatelessWidget {
     List<CircleMarker> circles = [];
 
     // Separate zones by type for proper layering
-    final orangeZones = zones.where((z) =>
-      z.type == app_zone.ZoneType.danger &&
-      z.intensity == app_zone.ZoneIntensity.medium
-    ).toList();
+    final orangeZones = zones
+        .where(
+          (z) =>
+              z.type == app_zone.ZoneType.danger &&
+              z.intensity == app_zone.ZoneIntensity.medium,
+        )
+        .toList();
 
-    final redZones = zones.where((z) =>
-      z.type == app_zone.ZoneType.danger &&
-      z.intensity == app_zone.ZoneIntensity.high
-    ).toList();
+    final redZones = zones
+        .where(
+          (z) =>
+              z.type == app_zone.ZoneType.danger &&
+              z.intensity == app_zone.ZoneIntensity.high,
+        )
+        .toList();
 
-    final safeZones = zones.where((z) => z.type == app_zone.ZoneType.safe).toList();
+    final safeZones = zones
+        .where((z) => z.type == app_zone.ZoneType.safe)
+        .toList();
 
     // Add orange zones first (bottom layer)
     for (final zone in orangeZones) {
@@ -461,7 +512,11 @@ class MapTab extends StatelessWidget {
     return circles;
   }
 
-  List<Marker> _buildMarkers(AdminProvider adminProvider, List<app_zone.Zone> zones) {
+  List<Marker> _buildMarkers(
+    BuildContext context,
+    AdminProvider adminProvider,
+    List<app_zone.Zone> zones,
+  ) {
     final markers = <Marker>[];
 
     // Add safe camp markers from admin provider
@@ -471,43 +526,49 @@ class MapTab extends StatelessWidget {
           point: LatLng(camp.latitude, camp.longitude),
           width: 80,
           height: 80,
-          child: Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: AppConstants.safeColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  camp.id,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
+          child: GestureDetector(
+            onTap: () => _showCampActionsPopup(context, adminProvider, camp),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppConstants.safeColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    camp.id,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppConstants.safeColor,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppConstants.safeColor.withOpacity(0.5),
-                      blurRadius: 8,
-                      spreadRadius: 2,
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppConstants.safeColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppConstants.safeColor.withOpacity(0.5),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.shield,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.shield,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -540,11 +601,7 @@ class MapTab extends StatelessWidget {
           point: LatLng(zone.latitude, zone.longitude),
           width: 40,
           height: 40,
-          child: Icon(
-            markerIcon,
-            color: markerColor,
-            size: 40,
-          ),
+          child: Icon(markerIcon, color: markerColor, size: 40),
         ),
       );
     }
@@ -552,12 +609,24 @@ class MapTab extends StatelessWidget {
     return markers;
   }
 
-  void _showAddCampDialog(BuildContext context, AdminProvider adminProvider) {
+  void _showAddCampDialog(
+    BuildContext context,
+    AdminProvider adminProvider, {
+    double? initialLatitude,
+    double? initialLongitude,
+  }) {
     final nameController = TextEditingController();
     final latController = TextEditingController();
     final lngController = TextEditingController();
     final capacityController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+
+    if (initialLatitude != null) {
+      latController.text = initialLatitude.toStringAsFixed(6);
+    }
+    if (initialLongitude != null) {
+      lngController.text = initialLongitude.toStringAsFixed(6);
+    }
 
     showDialog(
       context: context,
@@ -693,10 +762,11 @@ class MapTab extends StatelessWidget {
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: latController,
-                                    keyboardType: const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                      signed: true,
-                                    ),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                          signed: true,
+                                        ),
                                     decoration: InputDecoration(
                                       hintText: '13.1950',
                                       hintStyle: TextStyle(
@@ -705,7 +775,9 @@ class MapTab extends StatelessWidget {
                                       ),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(color: Colors.grey[300]!),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey[300]!,
+                                        ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(8),
@@ -716,9 +788,12 @@ class MapTab extends StatelessWidget {
                                       ),
                                       contentPadding: const EdgeInsets.all(12),
                                     ),
-                                    style: const TextStyle(fontFamily: 'monospace'),
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                    ),
                                     validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
                                         return 'Required';
                                       }
                                       if (double.tryParse(value) == null) {
@@ -747,10 +822,11 @@ class MapTab extends StatelessWidget {
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: lngController,
-                                    keyboardType: const TextInputType.numberWithOptions(
-                                      decimal: true,
-                                      signed: true,
-                                    ),
+                                    keyboardType:
+                                        const TextInputType.numberWithOptions(
+                                          decimal: true,
+                                          signed: true,
+                                        ),
                                     decoration: InputDecoration(
                                       hintText: '79.8750',
                                       hintStyle: TextStyle(
@@ -759,7 +835,9 @@ class MapTab extends StatelessWidget {
                                       ),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(color: Colors.grey[300]!),
+                                        borderSide: BorderSide(
+                                          color: Colors.grey[300]!,
+                                        ),
                                       ),
                                       focusedBorder: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(8),
@@ -770,9 +848,12 @@ class MapTab extends StatelessWidget {
                                       ),
                                       contentPadding: const EdgeInsets.all(12),
                                     ),
-                                    style: const TextStyle(fontFamily: 'monospace'),
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                    ),
                                     validator: (value) {
-                                      if (value == null || value.trim().isEmpty) {
+                                      if (value == null ||
+                                          value.trim().isEmpty) {
                                         return 'Required';
                                       }
                                       if (double.tryParse(value) == null) {
@@ -886,10 +967,11 @@ class MapTab extends StatelessWidget {
                             final name = nameController.text.trim();
                             final lat = double.parse(latController.text.trim());
                             final lng = double.parse(lngController.text.trim());
-                            final capacity = int.parse(capacityController.text.trim());
+                            final capacity = int.parse(
+                              capacityController.text.trim(),
+                            );
 
-                            // Generate unique ID
-                            final id = 'SC-${(adminProvider.safeCamps.length + 1).toString().padLeft(3, '0')}';
+                            final id = _nextCampId(adminProvider);
 
                             final camp = SafeCamp(
                               id: id,
@@ -968,6 +1050,77 @@ class MapTab extends StatelessWidget {
     );
   }
 
+  String _nextCampId(AdminProvider adminProvider) {
+    var maxId = 0;
+    final pattern = RegExp(r'^SC-(\d+)$');
+    for (final camp in adminProvider.safeCamps) {
+      final match = pattern.firstMatch(camp.id);
+      if (match == null) continue;
+      final value = int.tryParse(match.group(1) ?? '');
+      if (value != null && value > maxId) {
+        maxId = value;
+      }
+    }
+    final nextId = maxId + 1;
+    return 'SC-${nextId.toString().padLeft(3, '0')}';
+  }
+
+  void _showCampActionsPopup(
+    BuildContext rootContext,
+    AdminProvider adminProvider,
+    SafeCamp camp,
+  ) {
+    showModalBottomSheet(
+      context: rootContext,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              camp.name,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('Camp ID: ${camp.id}'),
+            Text('Coordinates: ${camp.coordinates}'),
+            Text('Capacity: ${camp.capacityInfo}'),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(sheetContext),
+                    child: const Text('Close'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _confirmDelete(rootContext, adminProvider, camp.id);
+                    },
+                    icon: const Icon(Icons.delete),
+                    label: const Text('Delete Camp'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppConstants.dangerColor,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _confirmDelete(
     BuildContext context,
     AdminProvider adminProvider,
@@ -976,9 +1129,7 @@ class MapTab extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Icon(
@@ -987,10 +1138,7 @@ class MapTab extends StatelessWidget {
               size: 24,
             ),
             const SizedBox(width: 12),
-            const Text(
-              'Delete Safe Camp',
-              style: TextStyle(fontSize: 16),
-            ),
+            const Text('Delete Safe Camp', style: TextStyle(fontSize: 16)),
           ],
         ),
         content: const Text(

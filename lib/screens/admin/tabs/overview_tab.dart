@@ -67,15 +67,19 @@ class _OverviewTabState extends State<OverviewTab> {
                           height: 12,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: adminProvider.systemStatus == SystemStatus.normal
+                            color:
+                                adminProvider.systemStatus ==
+                                    SystemStatus.normal
                                 ? Colors.green[300]
                                 : Colors.red[300],
                             boxShadow: [
                               BoxShadow(
-                                color: (adminProvider.systemStatus == SystemStatus.normal
-                                        ? Colors.green[300]
-                                        : Colors.red[300])!
-                                    .withOpacity(0.8),
+                                color:
+                                    (adminProvider.systemStatus ==
+                                                SystemStatus.normal
+                                            ? Colors.green[300]
+                                            : Colors.red[300])!
+                                        .withOpacity(0.8),
                                 blurRadius: 8,
                                 spreadRadius: 2,
                               ),
@@ -94,7 +98,8 @@ class _OverviewTabState extends State<OverviewTab> {
                         ),
                         const Spacer(),
                         ElevatedButton.icon(
-                          onPressed: () => _showSimulationDialog(context, adminProvider),
+                          onPressed: () =>
+                              _showSimulationDialog(context, adminProvider),
                           icon: const Icon(Icons.play_arrow, size: 14),
                           label: const Text(
                             'SIMULATE',
@@ -133,7 +138,8 @@ class _OverviewTabState extends State<OverviewTab> {
                       Text(
                         '${adminProvider.currentDisasterType?.toUpperCase() ?? 'DISASTER'} PROTOCOL ACTIVE • Response Teams Deployed',
                         style: TextStyle(
-                          color: adminProvider.systemStatus == SystemStatus.normal
+                          color:
+                              adminProvider.systemStatus == SystemStatus.normal
                               ? Colors.green[200]
                               : Colors.red[200],
                           fontSize: 10,
@@ -214,12 +220,13 @@ class _OverviewTabState extends State<OverviewTab> {
                     GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 1.1,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 1.1,
+                          ),
                       itemCount: adminProvider.sensorReadings.length,
                       itemBuilder: (context, index) {
                         final sensor = adminProvider.sensorReadings[index];
@@ -239,67 +246,190 @@ class _OverviewTabState extends State<OverviewTab> {
               ),
               const SizedBox(height: 20),
 
-              // Decision Agent - Logistics Control (shown during active emergency)
-              if (adminProvider.systemStatus != SystemStatus.normal)
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.purple[50]!, Colors.blue[50]!],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.purple[300]!,
-                      width: 2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purple.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+              // Decision Agent - Logistics Control
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.purple[50]!, Colors.blue[50]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header
-                      Row(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.purple[300]!, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.purple.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.purple[100],
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.psychology,
+                            size: 16,
+                            color: Colors.purple[700],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'DECISION AGENT - LOGISTICS CONTROL',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'AI-powered resource allocation based on real-time data',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (adminProvider.systemStatus == SystemStatus.normal)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'No active incident. Use SIMULATE to run a scenario and see live decision updates.',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.blue[900],
+                          ),
+                        ),
+                      ),
+                    if (adminProvider.systemStatus == SystemStatus.normal)
+                      const SizedBox(height: 12),
+
+                    // AI Recommendations Display
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border(
+                          left: BorderSide(
+                            color: Colors.purple[600]!,
+                            width: 4,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.purple[100],
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  Icons.auto_awesome,
+                                  size: 14,
+                                  color: Colors.purple[700],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'AI RESOURCE RECOMMENDATIONS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[700],
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          // Display AI suggestions in grid
+                          GridView.count(
+                            crossAxisCount: 2,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 2.5,
+                            children: [
+                              _buildAiSuggestionChip(
+                                'Ambulances',
+                                adminProvider.aiSuggestions['ambulances']
+                                        ?.toString() ??
+                                    '12',
+                              ),
+                              _buildAiSuggestionChip(
+                                'Rescue Boats',
+                                adminProvider.aiSuggestions['boats']
+                                        ?.toString() ??
+                                    '8',
+                              ),
+                              _buildAiSuggestionChip(
+                                'Food Packets',
+                                adminProvider.aiSuggestions['foodPackets']
+                                        ?.toString() ??
+                                    '5000',
+                              ),
+                              _buildAiSuggestionChip(
+                                'Medical Kits',
+                                adminProvider.aiSuggestions['medicalKits']
+                                        ?.toString() ??
+                                    '200',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.purple[100],
-                              shape: BoxShape.circle,
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Icon(
-                              Icons.psychology,
-                              size: 16,
-                              color: Colors.purple[700],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Row(
                               children: [
-                                Text(
-                                  'DECISION AGENT - LOGISTICS CONTROL',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[800],
-                                    letterSpacing: 0.5,
-                                  ),
+                                Icon(
+                                  Icons.info_outline,
+                                  size: 12,
+                                  color: Colors.blue[700],
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'AI-powered resource allocation based on real-time data',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.grey[600],
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Based on: ${adminProvider.sosAlertsCount} SOS alerts, ${adminProvider.aidRequestsCount} aid requests, weather data, and map analysis',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.blue[900],
+                                    ),
                                   ),
                                 ),
                               ],
@@ -307,287 +437,192 @@ class _OverviewTabState extends State<OverviewTab> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                    ),
+                    const SizedBox(height: 16),
 
-                      // AI Recommendations Display
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border(
-                            left: BorderSide(
-                              color: Colors.purple[600]!,
-                              width: 4,
-                            ),
+                    // Admin Override Section
+                    Row(
+                      children: [
+                        Icon(Icons.settings, size: 12, color: Colors.grey[700]),
+                        const SizedBox(width: 6),
+                        Text(
+                          'ADMIN OVERRIDE (Edit to modify AI suggestions)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[700],
+                            letterSpacing: 0.3,
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.purple[100],
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.auto_awesome,
-                                    size: 14,
-                                    color: Colors.purple[700],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'AI RESOURCE RECOMMENDATIONS',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700],
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Override Input Fields
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 2.0,
+                      children: [
+                        _buildOverrideField(
+                          'Ambulances',
+                          _ambulancesController,
+                          adminProvider.aiSuggestions['ambulances']
+                                  ?.toString() ??
+                              '12',
+                        ),
+                        _buildOverrideField(
+                          'Rescue Boats',
+                          _boatsController,
+                          adminProvider.aiSuggestions['boats']?.toString() ??
+                              '8',
+                        ),
+                        _buildOverrideField(
+                          'Food Packets',
+                          _foodPacketsController,
+                          adminProvider.aiSuggestions['foodPackets']
+                                  ?.toString() ??
+                              '5000',
+                        ),
+                        _buildOverrideField(
+                          'Medical Kits',
+                          _medicalKitsController,
+                          adminProvider.aiSuggestions['medicalKits']
+                                  ?.toString() ??
+                              '200',
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Apply Button
+                    ElevatedButton(
+                      onPressed: () =>
+                          _applyDecisionOverrides(context, adminProvider),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple[600],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.check_circle, size: 16),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'APPLY OVERRIDES & RECALCULATE',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              letterSpacing: 0.5,
                             ),
-                            const SizedBox(height: 12),
-                            // Display AI suggestions in grid
-                            GridView.count(
-                              crossAxisCount: 2,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              crossAxisSpacing: 8,
-                              mainAxisSpacing: 8,
-                              childAspectRatio: 2.5,
-                              children: [
-                                _buildAiSuggestionChip(
-                                  'Ambulances',
-                                  adminProvider.aiSuggestions['ambulances']?.toString() ?? '12',
-                                ),
-                                _buildAiSuggestionChip(
-                                  'Rescue Boats',
-                                  adminProvider.aiSuggestions['boats']?.toString() ?? '8',
-                                ),
-                                _buildAiSuggestionChip(
-                                  'Food Packets',
-                                  adminProvider.aiSuggestions['foodPackets']?.toString() ?? '5000',
-                                ),
-                                _buildAiSuggestionChip(
-                                  'Medical Kits',
-                                  adminProvider.aiSuggestions['medicalKits']?.toString() ?? '200',
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.blue[50],
-                                borderRadius: BorderRadius.circular(6),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Warning Note
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.yellow[50],
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border(
+                          left: BorderSide(
+                            color: Colors.yellow[700]!,
+                            width: 4,
+                          ),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 14,
+                            color: Colors.yellow[800],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Note: System will recalculate resource gaps and suggest backup plans. Your override decisions are logged for learning.',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.yellow[900],
                               ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Audit Trail (if exists)
+                    if (adminProvider.decisionAudit.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      const Divider(),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 12,
+                            color: Colors.grey[600],
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'RECENT DECISIONS',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[700],
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ...adminProvider.decisionAudit
+                          .take(3)
+                          .map(
+                            (audit) => Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    size: 12,
-                                    color: Colors.blue[700],
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 4),
+                                    width: 4,
+                                    height: 4,
+                                    decoration: BoxDecoration(
+                                      color: Colors.purple[400],
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Based on: ${adminProvider.sosAlertsCount} SOS alerts, ${adminProvider.aidRequestsCount} aid requests, weather data, and map analysis',
+                                      audit,
                                       style: TextStyle(
-                                        fontSize: 9,
-                                        color: Colors.blue[900],
+                                        fontSize: 10,
+                                        color: Colors.grey[700],
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Admin Override Section
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.settings,
-                            size: 12,
-                            color: Colors.grey[700],
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'ADMIN OVERRIDE (Edit to modify AI suggestions)',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Override Input Fields
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 2.0,
-                        children: [
-                          _buildOverrideField(
-                            'Ambulances',
-                            _ambulancesController,
-                            adminProvider.aiSuggestions['ambulances']?.toString() ?? '12',
-                          ),
-                          _buildOverrideField(
-                            'Rescue Boats',
-                            _boatsController,
-                            adminProvider.aiSuggestions['boats']?.toString() ?? '8',
-                          ),
-                          _buildOverrideField(
-                            'Food Packets',
-                            _foodPacketsController,
-                            adminProvider.aiSuggestions['foodPackets']?.toString() ?? '5000',
-                          ),
-                          _buildOverrideField(
-                            'Medical Kits',
-                            _medicalKitsController,
-                            adminProvider.aiSuggestions['medicalKits']?.toString() ?? '200',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Apply Button
-                      ElevatedButton(
-                        onPressed: () => _applyDecisionOverrides(context, adminProvider),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple[600],
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.check_circle, size: 16),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'APPLY OVERRIDES & RECALCULATE',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Warning Note
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.yellow[50],
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border(
-                            left: BorderSide(
-                              color: Colors.yellow[700]!,
-                              width: 4,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              size: 14,
-                              color: Colors.yellow[800],
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Note: System will recalculate resource gaps and suggest backup plans. Your override decisions are logged for learning.',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.yellow[900],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Audit Trail (if exists)
-                      if (adminProvider.decisionAudit.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        const Divider(),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.history,
-                              size: 12,
-                              color: Colors.grey[600],
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'RECENT DECISIONS',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[700],
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ...adminProvider.decisionAudit.take(3).map(
-                              (audit) => Padding(
-                                padding: const EdgeInsets.only(bottom: 4),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      margin: const EdgeInsets.only(top: 4),
-                                      width: 4,
-                                      height: 4,
-                                      decoration: BoxDecoration(
-                                        color: Colors.purple[400],
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        audit,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey[700],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
+              ),
             ],
           ),
         );
@@ -606,13 +641,7 @@ class _OverviewTabState extends State<OverviewTab> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 9,
-              color: Colors.grey[600],
-            ),
-          ),
+          Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[600])),
           const SizedBox(height: 2),
           Text(
             '$value units',
@@ -636,28 +665,16 @@ class _OverviewTabState extends State<OverviewTab> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 9,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 9, color: Colors.grey[600])),
         const SizedBox(height: 4),
         TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           decoration: InputDecoration(
             hintText: placeholder,
-            hintStyle: TextStyle(
-              color: Colors.grey[400],
-              fontSize: 12,
-            ),
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 12),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 8,
               vertical: 8,
@@ -668,10 +685,7 @@ class _OverviewTabState extends State<OverviewTab> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(6),
-              borderSide: BorderSide(
-                color: Colors.purple[400]!,
-                width: 2,
-              ),
+              borderSide: BorderSide(color: Colors.purple[400]!, width: 2),
             ),
           ),
         ),
@@ -679,13 +693,14 @@ class _OverviewTabState extends State<OverviewTab> {
     );
   }
 
-  void _showSimulationDialog(BuildContext context, AdminProvider adminProvider) {
+  void _showSimulationDialog(
+    BuildContext context,
+    AdminProvider adminProvider,
+  ) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -714,10 +729,7 @@ class _OverviewTabState extends State<OverviewTab> {
                   SizedBox(height: 4),
                   Text(
                     'Select disaster scenario for demo',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white70,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.white70),
                   ),
                 ],
               ),
@@ -838,7 +850,7 @@ class _OverviewTabState extends State<OverviewTab> {
   ) {
     // Collect override values
     final overrides = <String, int>{};
-    
+
     if (_ambulancesController.text.isNotEmpty) {
       overrides['ambulances'] = int.tryParse(_ambulancesController.text) ?? 0;
     }
@@ -855,7 +867,9 @@ class _OverviewTabState extends State<OverviewTab> {
     if (overrides.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No changes detected. Please modify at least one resource allocation.'),
+          content: Text(
+            'No changes detected. Please modify at least one resource allocation.',
+          ),
         ),
       );
       return;
@@ -882,9 +896,7 @@ class _OverviewTabState extends State<OverviewTab> {
         ),
         backgroundColor: Colors.purple[600],
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
