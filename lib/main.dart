@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'providers/location_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/zone_provider.dart';
+import 'providers/assessment_provider.dart';
 import 'screens/main_screen.dart';
 import 'utils/constants.dart';
 
@@ -20,6 +21,7 @@ class CercaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(create: (_) => ZoneProvider()),
+        ChangeNotifierProvider(create: (_) => AssessmentProvider()),
       ],
       child: MaterialApp(
         title: AppConstants.appName,
@@ -75,16 +77,21 @@ class _AppInitializerState extends State<AppInitializer> {
   }
 
   Future<void> _initializeApp() async {
-    // Initialize location provider first
     final locationProvider = context.read<LocationProvider>();
     await locationProvider.initialize();
 
-    // Initialize zone provider with user's location
     final zoneProvider = context.read<ZoneProvider>();
     await zoneProvider.initialize(
       latitude: locationProvider.latitude,
       longitude: locationProvider.longitude,
     );
+
+    // Start AI assessment immediately at launch using GPS location
+    final lat = locationProvider.latitude;
+    final lon = locationProvider.longitude;
+    if (lat != null && lon != null) {
+      context.read<AssessmentProvider>().assessByCoordinates(lat, lon);
+    }
   }
 
   @override

@@ -45,10 +45,6 @@ class AdminProvider with ChangeNotifier {
   List<SafeCamp> _safeCamps = [];
   List<SafeCamp> get safeCamps => _safeCamps;
 
-  // Current disaster type for active simulations
-  String? _currentDisasterType;
-  String? get currentDisasterType => _currentDisasterType;
-
   // Communication logs
   List<CommunicationLog> _communicationLogs = [];
   List<CommunicationLog> get communicationLogs => _communicationLogs;
@@ -87,116 +83,6 @@ class AdminProvider with ChangeNotifier {
     final statuses = SystemStatus.values;
     final currentIndex = statuses.indexOf(_systemStatus);
     _systemStatus = statuses[(currentIndex + 1) % statuses.length];
-    notifyListeners();
-  }
-
-  /// Load a dummy scenario for a given disaster type (human-triggered simulation).
-  /// This uses the local AdminDataService mock data and tailors one incident to the
-  /// requested disaster type. Endpoints to fetch real backend data can be added later.
-  void loadDummyScenario(String disasterType) {
-    // Base mock data
-    _agentStatuses = AdminDataService.getAgentStatuses();
-    _sensorReadings = AdminDataService.getSensorReadings();
-    _sosRequests = AdminDataService.getSosRequests();
-    _aidRequests = AdminDataService.getAidRequests();
-    _communicationLogs = AdminDataService.getCommunicationLogs();
-    _safeCamps = AdminDataService.getSafeCamps();
-
-    // Create a scenario-specific incident
-    final lower = disasterType.toLowerCase();
-    IncidentSeverity severity;
-    // Use substring matching so UI labels like "Coastal Flood" or "Forest Fire"
-    // map correctly to the intended severity.
-    if (lower.contains('flood') || lower.contains('earthquake') || lower.contains('cyclone')) {
-      severity = IncidentSeverity.critical;
-    } else if (lower.contains('drought') || lower.contains('fire') || lower.contains('heat')) {
-      severity = IncidentSeverity.high;
-    } else {
-      severity = IncidentSeverity.medium;
-    }
-
-    final status = IncidentStatus.ongoing;
-    final now = DateTime.now();
-    _currentDisasterType = disasterType;
-
-    _incidentHistory = [
-      IncidentHistory(
-        id: 'SIM-${now.millisecondsSinceEpoch}',
-        severity: severity,
-        status: status,
-        disasterType: disasterType,
-        duration: 'Ongoing',
-        responseTime: 'TBD',
-        affectedCount: 0,
-        evacuatedCount: 0,
-        timestamp: now,
-      ),
-      ...AdminDataService.getIncidentHistory(),
-    ];
-
-    // Set system status based on severity
-    if (severity == IncidentSeverity.critical) {
-      _systemStatus = SystemStatus.critical;
-    } else if (severity == IncidentSeverity.high) {
-      _systemStatus = SystemStatus.degraded;
-    } else {
-      _systemStatus = SystemStatus.normal;
-    }
-
-    _updateNotificationCount();
-    notifyListeners();
-  }
-
-  /// Number of recent SOS alerts
-  int get sosAlertsCount => _sosRequests.length;
-
-  /// Number of pending aid requests
-  int get aidRequestsCount => _aidRequests.length;
-
-  /// Provide AI suggestions as a simple map for the UI.
-  /// This is a lightweight heuristic based on system status.
-  Map<String, int> get aiSuggestions {
-    final base = aiSuggestion; // a small base number
-    switch (_systemStatus) {
-      case SystemStatus.normal:
-        return {
-          'ambulances': 2 + base,
-          'boats': 1 + (base ~/ 3),
-          'foodPackets': 500 + (base * 50),
-          'medicalKits': 50 + (base * 5),
-        };
-      case SystemStatus.degraded:
-        return {
-          'ambulances': 5 + base,
-          'boats': 3 + (base ~/ 2),
-          'foodPackets': 2000 + (base * 100),
-          'medicalKits': 150 + (base * 10),
-        };
-      case SystemStatus.critical:
-        return {
-          'ambulances': 10 + base,
-          'boats': 6 + base,
-          'foodPackets': 5000 + (base * 200),
-          'medicalKits': 400 + (base * 20),
-        };
-    }
-  }
-
-  /// Apply resource overrides provided by admin (human-in-the-loop).
-  /// Records the override in the audit trail and triggers a simple recalculation.
-  void applyResourceOverrides(Map<String, int> overrides) {
-    final timestamp = DateTime.now().toIso8601String();
-    final entry = '[$timestamp] Admin overrides: ${overrides.toString()}';
-    _decisionAudit.insert(0, entry);
-    _lastDecisionNote = entry;
-
-    // Simple simulation: if admin reduces ambulances drastically, degrade status
-    final ambulances = overrides['ambulances'];
-    if (ambulances != null && ambulances < (aiSuggestion / 2) && _systemStatus == SystemStatus.normal) {
-      _systemStatus = SystemStatus.degraded;
-    }
-
-    _updateNotificationCount();
     notifyListeners();
   }
 
@@ -263,44 +149,4 @@ class AdminProvider with ChangeNotifier {
 
   /// Get total sessions count
   int get totalSessions => _incidentHistory.length;
-
-  // --- AI Decisioning (Human-in-the-loop) ---
-  final List<String> _decisionAudit = [];
-  List<String> get decisionAudit => List.unmodifiable(_decisionAudit);
-
-  String? _lastDecisionNote;
-  String? get lastDecisionNote => _lastDecisionNote;
-
-  /// Simple AI suggestion based on system status
-  int get aiSuggestion {
-    switch (_systemStatus) {
-      case SystemStatus.normal:
-        return 0;
-      case SystemStatus.degraded:
-        return 5;
-      case SystemStatus.critical:
-        return 10;
-    }
-  }
-
-  /// Apply an admin override to the AI suggestion and create an audit trail.
-  void applyAiSuggestionOverride(int overriddenValue) {
-    final suggestion = aiSuggestion;
-    final timestamp = DateTime.now().toIso8601String();
-    final entry = '[$timestamp] AI suggested $suggestion ambulances — Admin overrode to $overriddenValue';
-    _decisionAudit.insert(0, entry);
-    _lastDecisionNote = entry;
-
-    // Placeholder for recalculation: if admin reduces resources below suggestion,
-    // escalate status to degraded; if admin increases above suggestion and system
-    // was degraded, mark as normal — this simulates a decision agent recalculation.
-    if (overriddenValue < suggestion && _systemStatus == SystemStatus.normal) {
-      _systemStatus = SystemStatus.degraded;
-    } else if (overriddenValue >= suggestion && _systemStatus == SystemStatus.degraded) {
-      _systemStatus = SystemStatus.normal;
-    }
-
-    _updateNotificationCount();
-    notifyListeners();
-  }
 }
