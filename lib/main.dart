@@ -4,6 +4,7 @@ import 'providers/location_provider.dart';
 import 'providers/navigation_provider.dart';
 import 'providers/zone_provider.dart';
 import 'providers/assessment_provider.dart';
+import 'providers/admin_provider.dart';
 import 'screens/main_screen.dart';
 import 'utils/constants.dart';
 
@@ -22,6 +23,7 @@ class CercaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(create: (_) => ZoneProvider()),
         ChangeNotifierProvider(create: (_) => AssessmentProvider()),
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
       child: MaterialApp(
         title: AppConstants.appName,

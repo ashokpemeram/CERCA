@@ -3,20 +3,72 @@ import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../providers/admin_provider.dart';
+import '../../../providers/location_provider.dart';
 import '../../../providers/zone_provider.dart';
 import '../../../utils/constants.dart';
+import '../../../utils/helpers.dart';
 import '../../../models/admin/safe_camp.dart';
+import '../../../models/admin/sos_request.dart';
+import '../../../models/admin/disaster_event.dart';
 import '../../../widgets/admin/info_card.dart';
 import '../../../models/zone.dart' as app_zone;
 
 /// Map tab for admin dashboard
-class MapTab extends StatelessWidget {
+class MapTab extends StatefulWidget {
   const MapTab({super.key});
 
   @override
+  State<MapTab> createState() => _MapTabState();
+}
+
+class _MapTabState extends State<MapTab> {
+  final MapController _mapController = MapController();
+  LatLng? _pendingMapPin;
+  String? _lastCenteredAreaId;
+  String? _lastCenteredSimulationId;
+  bool _isRecentering = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Consumer2<AdminProvider, ZoneProvider>(
-      builder: (context, adminProvider, zoneProvider, child) {
+    return Consumer3<AdminProvider, ZoneProvider, LocationProvider>(
+      builder: (context, adminProvider, zoneProvider, locationProvider, child) {
+        final camps = adminProvider.safeCampsForCurrentArea;
+        final position = locationProvider.currentPosition;
+        final currentLocation = position != null
+            ? LatLng(position.latitude, position.longitude)
+            : null;
+        final simulation = adminProvider.activeSimulation;
+        final currentArea = adminProvider.currentArea;
+        final simulationCenter = simulation != null
+            ? LatLng(simulation.centerLat, simulation.centerLon)
+            : null;
+        final areaCenter = currentArea != null
+            ? LatLng(currentArea.centerLat, currentArea.centerLon)
+            : null;
+        const staticZones = <app_zone.Zone>[];
+
+        if (simulation != null &&
+            _lastCenteredSimulationId != simulation.id &&
+            simulationCenter != null) {
+          _lastCenteredSimulationId = simulation.id;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _mapController.move(simulationCenter, 12.0);
+          });
+        } else if (simulation == null &&
+            currentArea != null &&
+            _lastCenteredAreaId != currentArea.id) {
+          _lastCenteredAreaId = currentArea.id;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _mapController.move(areaCenter!, 12.0);
+          });
+        } else if (simulation == null &&
+            currentArea == null &&
+            currentLocation != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _mapController.move(currentLocation, 12.0);
+          });
+        }
+
         return Column(
           children: [
             // Header with gradient
@@ -104,16 +156,53 @@ class MapTab extends StatelessWidget {
               child: Stack(
                 children: [
                   FlutterMap(
+                    mapController: _mapController,
                     options: MapOptions(
-                      initialCenter: LatLng(19.0760, 72.8777),
+                      initialCenter:
+                          simulationCenter ??
+                          areaCenter ??
+                          currentLocation ??
+                          LatLng(19.0760, 72.8777),
                       initialZoom: 12.0,
-                      onLongPress: (tapPosition, point) {
-                        _showAddCampDialog(
-                          context,
-                          adminProvider,
-                          initialLatitude: point.latitude,
-                          initialLongitude: point.longitude,
+                      onPositionChanged: (position, hasGesture) {
+                        if (_isRecentering) return;
+                        if (!hasGesture) return;
+                        if (simulation == null && currentArea == null) return;
+                        final center = position.center;
+                        if (center == null) return;
+                        final boundaryCenter = simulationCenter ??
+                            (currentArea != null
+                                ? LatLng(
+                                    currentArea.centerLat,
+                                    currentArea.centerLon,
+                                  )
+                                : null);
+                        final boundaryRadius = simulation != null
+                            ? simulation.radiusM
+                            : currentArea?.controllableRadiusM;
+                        if (boundaryCenter == null || boundaryRadius == null) {
+                          return;
+                        }
+                        final distance = Helpers.calculateDistance(
+                          center.latitude,
+                          center.longitude,
+                          boundaryCenter.latitude,
+                          boundaryCenter.longitude,
                         );
+                        if (distance > boundaryRadius) {
+                          _isRecentering = true;
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _mapController.move(
+                              boundaryCenter,
+                              position.zoom ?? 12.0,
+                            );
+                            _isRecentering = false;
+                          });
+                        }
+                      },
+                      onLongPress: (tapPosition, point) {
+                        setState(() => _pendingMapPin = point);
+                        _showAddCampDialog(context, adminProvider);
                       },
                     ),
                     children: [
@@ -124,14 +213,16 @@ class MapTab extends StatelessWidget {
                       ),
                       // Zone Circles (danger and safe zones)
                       CircleLayer(
-                        circles: _buildCircleLayers(zoneProvider.zones),
+                        circles: _buildCircleLayers(staticZones, adminProvider),
                       ),
                       // Markers (safe camps and zone centers)
                       MarkerLayer(
                         markers: _buildMarkers(
                           context,
                           adminProvider,
-                          zoneProvider.zones,
+                          staticZones,
+                          pendingPin: _pendingMapPin,
+                          currentLocation: currentLocation,
                         ),
                       ),
                     ],
@@ -165,6 +256,11 @@ class MapTab extends StatelessWidget {
                             spacing: 12,
                             runSpacing: 6,
                             children: [
+                              if (simulation != null)
+                                _buildLegendItem(
+                                  'Simulation Zone',
+                                  _severityColor(simulation.severity),
+                                ),
                               _buildLegendItem(
                                 'High Hazard',
                                 AppConstants.dangerColor,
@@ -174,15 +270,26 @@ class MapTab extends StatelessWidget {
                                 AppConstants.mediumRiskColor,
                               ),
                               _buildLegendItem(
+                                'SOS Alert',
+                                AppConstants.dangerColor,
+                              ),
+                              _buildLegendItem(
                                 'Safe Camp',
                                 AppConstants.safeColor,
                               ),
-                              _buildLegendItem('Control Center', Colors.blue),
+                              _buildLegendItem(
+                                'Citizen Location',
+                                Colors.blue,
+                              ),
+                              _buildLegendItem(
+                                'Controllable Boundary',
+                                Colors.blue,
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Long-press map to add a safe camp.',
+                            'Long-press map to drop a pin for a safe camp.',
                             style: TextStyle(
                               color: Colors.white70,
                               fontSize: 10,
@@ -237,7 +344,7 @@ class MapTab extends StatelessWidget {
                       ),
                     ),
                     Expanded(
-                      child: adminProvider.safeCamps.isEmpty
+                      child: camps.isEmpty
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -262,9 +369,9 @@ class MapTab extends StatelessWidget {
                               padding: const EdgeInsets.all(
                                 AppConstants.paddingMedium,
                               ),
-                              itemCount: adminProvider.safeCamps.length,
+                              itemCount: camps.length,
                               itemBuilder: (context, index) {
-                                final camp = adminProvider.safeCamps[index];
+                                final camp = camps[index];
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: InfoCard(
@@ -419,6 +526,17 @@ class MapTab extends StatelessWidget {
     );
   }
 
+  Color _severityColor(DisasterSeverity severity) {
+    switch (severity) {
+      case DisasterSeverity.low:
+        return Colors.yellow[700]!;
+      case DisasterSeverity.medium:
+        return AppConstants.warningColor;
+      case DisasterSeverity.high:
+        return AppConstants.dangerColor;
+    }
+  }
+
   Widget _buildLegendItem(String label, Color color) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -437,8 +555,26 @@ class MapTab extends StatelessWidget {
     );
   }
 
-  List<CircleMarker> _buildCircleLayers(List<app_zone.Zone> zones) {
-    List<CircleMarker> circles = [];
+  List<CircleMarker> _buildCircleLayers(
+    List<app_zone.Zone> zones,
+    AdminProvider adminProvider,
+  ) {
+    final circles = <CircleMarker>[];
+    final simulation = adminProvider.activeSimulation;
+
+    if (simulation != null) {
+      final color = _severityColor(simulation.severity);
+      circles.add(
+        CircleMarker(
+          point: LatLng(simulation.centerLat, simulation.centerLon),
+          radius: simulation.radiusM,
+          useRadiusInMeter: true,
+          color: color.withOpacity(0.18),
+          borderColor: color.withOpacity(0.9),
+          borderStrokeWidth: 2,
+        ),
+      );
+    }
 
     // Separate zones by type for proper layering
     final orangeZones = zones
@@ -477,7 +613,7 @@ class MapTab extends StatelessWidget {
       }
     }
 
-    // Add red zones (top layer)
+    // Add red zones
     for (final zone in redZones) {
       if (zone.radiusInMeters > 0) {
         circles.add(
@@ -509,18 +645,146 @@ class MapTab extends StatelessWidget {
       }
     }
 
+    // Add current area rings
+    final currentArea = adminProvider.currentArea;
+    if (currentArea != null) {
+      circles.addAll([
+        CircleMarker(
+          point: LatLng(currentArea.centerLat, currentArea.centerLon),
+          radius: currentArea.redRadiusM,
+          useRadiusInMeter: true,
+          color: AppConstants.dangerColor.withOpacity(0.45),
+          borderColor: AppConstants.dangerColor,
+          borderStrokeWidth: 2,
+        ),
+        CircleMarker(
+          point: LatLng(currentArea.centerLat, currentArea.centerLon),
+          radius: currentArea.warningRadiusM,
+          useRadiusInMeter: true,
+          color: AppConstants.warningColor.withOpacity(0.25),
+          borderColor: AppConstants.warningColor,
+          borderStrokeWidth: 2,
+        ),
+        CircleMarker(
+          point: LatLng(currentArea.centerLat, currentArea.centerLon),
+          radius: currentArea.greenRadiusM,
+          useRadiusInMeter: true,
+          color: AppConstants.safeColor.withOpacity(0.18),
+          borderColor: AppConstants.safeColor,
+          borderStrokeWidth: 2,
+        ),
+        CircleMarker(
+          point: LatLng(currentArea.centerLat, currentArea.centerLon),
+          radius: currentArea.controllableRadiusM,
+          useRadiusInMeter: true,
+          color: Colors.transparent,
+          borderColor: Colors.blue.withOpacity(0.7),
+          borderStrokeWidth: 2,
+        ),
+      ]);
+    }
+
     return circles;
   }
 
   List<Marker> _buildMarkers(
     BuildContext context,
     AdminProvider adminProvider,
-    List<app_zone.Zone> zones,
+    List<app_zone.Zone> zones, {
+    LatLng? pendingPin,
+    LatLng? currentLocation,
+  }
   ) {
     final markers = <Marker>[];
+    final sosRequests = adminProvider.sosRequestsForAdminView;
+
+    if (currentLocation != null) {
+      markers.add(
+        Marker(
+          point: currentLocation,
+          width: 40,
+          height: 40,
+          child: const Icon(
+            Icons.my_location,
+            color: Colors.blue,
+            size: 40,
+          ),
+        ),
+      );
+    }
+
+    if (pendingPin != null) {
+      markers.add(
+        Marker(
+          point: pendingPin,
+          width: 40,
+          height: 40,
+          child: const Icon(
+            Icons.location_pin,
+            color: AppConstants.dangerColor,
+            size: 40,
+          ),
+        ),
+      );
+    }
+
+    for (final sos in sosRequests) {
+      final isPending = sos.status == SosStatus.pending;
+      final markerColor =
+          isPending ? AppConstants.dangerColor : AppConstants.safeColor;
+      final icon = isPending ? Icons.sos : Icons.check_circle;
+      markers.add(
+        Marker(
+          point: LatLng(sos.latitude, sos.longitude),
+          width: 90,
+          height: 90,
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: markerColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  sos.id,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: markerColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: markerColor.withOpacity(0.5),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     // Add safe camp markers from admin provider
-    for (final camp in adminProvider.safeCamps) {
+    for (final camp in adminProvider.safeCampsForCurrentArea) {
       markers.add(
         Marker(
           point: LatLng(camp.latitude, camp.longitude),
@@ -611,21 +875,19 @@ class MapTab extends StatelessWidget {
 
   void _showAddCampDialog(
     BuildContext context,
-    AdminProvider adminProvider, {
-    double? initialLatitude,
-    double? initialLongitude,
-  }) {
+    AdminProvider adminProvider,
+  ) {
     final nameController = TextEditingController();
     final latController = TextEditingController();
     final lngController = TextEditingController();
     final capacityController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final rootContext = context;
 
-    if (initialLatitude != null) {
-      latController.text = initialLatitude.toStringAsFixed(6);
-    }
-    if (initialLongitude != null) {
-      lngController.text = initialLongitude.toStringAsFixed(6);
+    final pendingPin = _pendingMapPin;
+    if (pendingPin != null) {
+      latController.text = pendingPin.latitude.toStringAsFixed(6);
+      lngController.text = pendingPin.longitude.toStringAsFixed(6);
     }
 
     showDialog(
@@ -743,128 +1005,183 @@ class MapTab extends StatelessWidget {
                           },
                         ),
                         const SizedBox(height: 16),
-                        // Latitude & Longitude
-                        Row(
+                        if (pendingPin != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[200]!),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_pin,
+                                  size: 16,
+                                  color: AppConstants.dangerColor,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Selected pin: ${pendingPin.latitude.toStringAsFixed(6)}, ${pendingPin.longitude.toStringAsFixed(6)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        ExpansionTile(
+                          tilePadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Advanced coordinates (optional)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'LATITUDE',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[700],
-                                      letterSpacing: 0.5,
-                                    ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'LATITUDE',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey[700],
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextFormField(
+                                        controller: latController,
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                              signed: true,
+                                            ),
+                                        decoration: InputDecoration(
+                                          hintText: '13.1950',
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontFamily: 'monospace',
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Colors.grey[300]!,
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: AppConstants.safeColor,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.all(12),
+                                        ),
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                        ),
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return null;
+                                          }
+                                          if (double.tryParse(value) == null) {
+                                            return 'Invalid';
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 8),
-                                  TextFormField(
-                                    controller: latController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                          signed: true,
-                                        ),
-                                    decoration: InputDecoration(
-                                      hintText: '13.1950',
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey[400],
-                                        fontFamily: 'monospace',
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey[300]!,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'LONGITUDE',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey[700],
+                                          letterSpacing: 0.5,
                                         ),
                                       ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: AppConstants.safeColor,
-                                          width: 2,
+                                      const SizedBox(height: 8),
+                                      TextFormField(
+                                        controller: lngController,
+                                        keyboardType:
+                                            const TextInputType.numberWithOptions(
+                                              decimal: true,
+                                              signed: true,
+                                            ),
+                                        decoration: InputDecoration(
+                                          hintText: '79.8750',
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey[400],
+                                            fontFamily: 'monospace',
+                                          ),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: Colors.grey[300]!,
+                                            ),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            borderSide: BorderSide(
+                                              color: AppConstants.safeColor,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          contentPadding:
+                                              const EdgeInsets.all(12),
                                         ),
+                                        style: const TextStyle(
+                                          fontFamily: 'monospace',
+                                        ),
+                                        validator: (value) {
+                                          if (value == null ||
+                                              value.trim().isEmpty) {
+                                            return null;
+                                          }
+                                          if (double.tryParse(value) == null) {
+                                            return 'Invalid';
+                                          }
+                                          return null;
+                                        },
                                       ),
-                                      contentPadding: const EdgeInsets.all(12),
-                                    ),
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                    ),
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Required';
-                                      }
-                                      if (double.tryParse(value) == null) {
-                                        return 'Invalid';
-                                      }
-                                      return null;
-                                    },
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'LONGITUDE',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey[700],
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  TextFormField(
-                                    controller: lngController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                          signed: true,
-                                        ),
-                                    decoration: InputDecoration(
-                                      hintText: '79.8750',
-                                      hintStyle: TextStyle(
-                                        color: Colors.grey[400],
-                                        fontFamily: 'monospace',
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: Colors.grey[300]!,
-                                        ),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        borderSide: BorderSide(
-                                          color: AppConstants.safeColor,
-                                          width: 2,
-                                        ),
-                                      ),
-                                      contentPadding: const EdgeInsets.all(12),
-                                    ),
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                    ),
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Required';
-                                      }
-                                      if (double.tryParse(value) == null) {
-                                        return 'Invalid';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
+                            const SizedBox(height: 8),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -963,43 +1280,124 @@ class MapTab extends StatelessWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
-                          if (formKey.currentState!.validate()) {
-                            final name = nameController.text.trim();
-                            final lat = double.parse(latController.text.trim());
-                            final lng = double.parse(lngController.text.trim());
-                            final capacity = int.parse(
-                              capacityController.text.trim(),
-                            );
+                          if (!formKey.currentState!.validate()) {
+                            return;
+                          }
 
-                            final id = _nextCampId(adminProvider);
+                          final name = nameController.text.trim();
+                          final capacity = int.parse(
+                            capacityController.text.trim(),
+                          );
 
-                            final camp = SafeCamp(
-                              id: id,
-                              name: name,
-                              status: CampStatus.active,
-                              latitude: lat,
-                              longitude: lng,
-                              capacity: capacity,
-                              currentOccupancy: 0,
-                            );
+                          final manualLat = latController.text.trim();
+                          final manualLng = lngController.text.trim();
+                          double? lat;
+                          double? lng;
 
-                            adminProvider.addSafeCamp(camp);
-                            Navigator.pop(context);
-
-                            // Show success message
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text(
-                                  'Safe camp added successfully! Location will sync to all citizen dashboards.',
+                          if (manualLat.isNotEmpty || manualLng.isNotEmpty) {
+                            if (manualLat.isEmpty || manualLng.isEmpty) {
+                              ScaffoldMessenger.of(rootContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Enter both latitude and longitude',
+                                  ),
+                                  backgroundColor: AppConstants.dangerColor,
                                 ),
-                                backgroundColor: AppConstants.safeColor,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                              );
+                              return;
+                            }
+                            lat = double.tryParse(manualLat);
+                            lng = double.tryParse(manualLng);
+                            if (lat == null || lng == null) {
+                              ScaffoldMessenger.of(rootContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Invalid coordinates'),
+                                  backgroundColor: AppConstants.dangerColor,
                                 ),
+                              );
+                              return;
+                            }
+                          } else if (_pendingMapPin != null) {
+                            lat = _pendingMapPin!.latitude;
+                            lng = _pendingMapPin!.longitude;
+                          } else {
+                            ScaffoldMessenger.of(rootContext).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Tap the map to drop a pin first',
+                                ),
+                                backgroundColor: AppConstants.dangerColor,
                               ),
                             );
+                            return;
                           }
+
+                          final loggedAreaId = adminProvider.loggedInAreaId;
+                          if (loggedAreaId == null) {
+                            ScaffoldMessenger.of(rootContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('No active area selected'),
+                                backgroundColor: AppConstants.dangerColor,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final route = adminProvider.routeToArea(lat, lng);
+                          if (route.areaId != loggedAreaId ||
+                              !route.insideControllable) {
+                            ScaffoldMessenger.of(rootContext).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Location is outside your area's controllable boundary",
+                                ),
+                                backgroundColor: AppConstants.dangerColor,
+                              ),
+                            );
+                            return;
+                          }
+
+                          final id = _nextCampId(adminProvider);
+
+                          final camp = SafeCamp(
+                            id: id,
+                            name: name,
+                            status: CampStatus.active,
+                            latitude: lat,
+                            longitude: lng,
+                            capacity: capacity,
+                            currentOccupancy: 0,
+                            areaId: loggedAreaId,
+                          );
+
+                          final success = adminProvider.addSafeCamp(camp);
+                          if (!success) {
+                            ScaffoldMessenger.of(rootContext).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "Location is outside your area's controllable boundary",
+                                ),
+                                backgroundColor: AppConstants.dangerColor,
+                              ),
+                            );
+                            return;
+                          }
+
+                          Navigator.pop(context);
+                          setState(() => _pendingMapPin = null);
+
+                          ScaffoldMessenger.of(rootContext).showSnackBar(
+                            SnackBar(
+                              content: const Text(
+                                'Safe camp added successfully! Location will sync to all citizen dashboards.',
+                              ),
+                              backgroundColor: AppConstants.safeColor,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          );
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConstants.safeColor,

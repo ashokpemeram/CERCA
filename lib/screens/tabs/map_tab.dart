@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/zone_provider.dart';
 import '../../providers/assessment_provider.dart';
+import '../../providers/admin_provider.dart';
 import '../../models/zone.dart' as app_zone;
 import '../../models/assessment_result.dart';
+import '../../models/admin/safe_camp.dart';
 import '../../utils/constants.dart';
 import '../../widgets/loading_indicator.dart';
 
@@ -23,6 +25,7 @@ class _MapTabState extends State<MapTab> {
   final MapController _mapController = MapController();
   bool _hasAutoAssessed = false;
   Timer? _assessmentTimer;
+  bool _hasShownLocationPrompt = false;
 
   @override
   void initState() {
@@ -62,13 +65,60 @@ class _MapTabState extends State<MapTab> {
     super.dispose();
   }
 
+  void _maybePromptForLocation(LocationProvider locationProvider) {
+    if (_hasShownLocationPrompt) return;
+    if (locationProvider.isLoading) return;
+    if (locationProvider.hasPermission && locationProvider.isServiceEnabled) {
+      return;
+    }
+    _hasShownLocationPrompt = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showLocationPrompt(locationProvider);
+    });
+  }
+
+  void _showLocationPrompt(LocationProvider locationProvider) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Enable Location'),
+        content: const Text(
+          'We need your location to assess risk and route help near you.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              if (!locationProvider.hasPermission) {
+                locationProvider.requestPermission();
+              } else if (!locationProvider.isServiceEnabled) {
+                locationProvider.openLocationSettings();
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Consumer3<LocationProvider, ZoneProvider, AssessmentProvider>(
-      builder: (context, locationProvider, zoneProvider, assessmentProvider, child) {
+    return Consumer4<LocationProvider, ZoneProvider, AssessmentProvider, AdminProvider>(
+      builder: (context, locationProvider, zoneProvider, assessmentProvider, adminProvider, child) {
         if (locationProvider.isLoading) {
           return const LoadingIndicator(message: 'Getting your location...');
         }
+
+        _maybePromptForLocation(locationProvider);
 
         if (locationProvider.errorMessage != null) {
           return _buildErrorView(locationProvider);
@@ -81,6 +131,16 @@ class _MapTabState extends State<MapTab> {
         final position = locationProvider.currentPosition!;
         final currentLatLng = LatLng(position.latitude, position.longitude);
         final result = assessmentProvider.result;
+        final route = adminProvider.routeToArea(
+          position.latitude,
+          position.longitude,
+        );
+        final activeAreaId = adminProvider.loggedInAreaId ?? route.areaId;
+        final adminCamps = activeAreaId == 'UNASSIGNED'
+            ? <SafeCamp>[]
+            : adminProvider.safeCamps
+                .where((camp) => camp.areaId == activeAreaId)
+                .toList();
 
         return Stack(
           children: [
@@ -117,6 +177,7 @@ class _MapTabState extends State<MapTab> {
                     zoneProvider.zones,
                     result,
                     assessmentProvider.isLoading,
+                    adminCamps,
                   ),
                 ),
               ],
@@ -148,6 +209,20 @@ class _MapTabState extends State<MapTab> {
                 assessmentProvider,
               ),
             ),
+
+            if (assessmentProvider.errorMessage != null)
+              Positioned(
+                top: 72,
+                left: 16,
+                right: 16,
+                child: _buildAssessmentErrorBanner(
+                  assessmentProvider.errorMessage!,
+                  () => assessmentProvider.assessByCoordinates(
+                    position.latitude,
+                    position.longitude,
+                  ),
+                ),
+              ),
 
             // Loading indicator overlay (small, non-blocking)
             if (assessmentProvider.isLoading)
@@ -405,6 +480,50 @@ class _MapTabState extends State<MapTab> {
     );
   }
 
+  Widget _buildAssessmentErrorBanner(
+    String message,
+    VoidCallback onRetry,
+  ) {
+    return Card(
+      color: AppConstants.dangerColor,
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          children: [
+            const Icon(Icons.wifi_off, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: onRetry,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<CircleMarker> _buildCircleLayers(
       List<app_zone.Zone> zones, AssessmentResult? result) {
     // Suppress mock circles when:
@@ -475,7 +594,8 @@ class _MapTabState extends State<MapTab> {
       LatLng currentLatLng,
       List<app_zone.Zone> zones,
       AssessmentResult? result,
-      bool isLoading) {
+      bool isLoading,
+      List<SafeCamp> adminCamps) {
     List<Marker> markers = [];
 
     markers.add(Marker(
@@ -484,6 +604,21 @@ class _MapTabState extends State<MapTab> {
       height: 40,
       child: const Icon(Icons.my_location, color: Colors.blue, size: 40),
     ));
+
+    for (final camp in adminCamps) {
+      markers.add(
+        Marker(
+          point: LatLng(camp.latitude, camp.longitude),
+          width: 40,
+          height: 40,
+          child: const Icon(
+            Icons.shield,
+            color: AppConstants.safeColor,
+            size: 40,
+          ),
+        ),
+      );
+    }
 
     for (final zone in zones) {
       // While AI is loading OR result is available, suppress mock zone markers
@@ -500,6 +635,9 @@ class _MapTabState extends State<MapTab> {
       IconData markerIcon;
 
       if (zone.type == app_zone.ZoneType.safeCamp) {
+        if (adminCamps.isNotEmpty) {
+          continue;
+        }
         markerColor = AppConstants.safeColor;
         markerIcon = Icons.home;
       } else if (zone.type == app_zone.ZoneType.danger) {

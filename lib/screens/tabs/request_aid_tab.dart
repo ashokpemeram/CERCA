@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/admin_provider.dart';
 import '../../models/aid_request.dart';
+import '../../models/admin/aid_request_admin.dart';
 import '../../services/api_service.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
@@ -630,7 +632,41 @@ Additional Details: ${_additionalDetailsController.text.isEmpty ? 'None' : _addi
       if (!mounted) return;
 
       if (response.success) {
-        _showSuccessDialog();
+        final adminProvider = context.read<AdminProvider>();
+        final urgency = _urgencyLevel ?? 'medium';
+        final priority = urgency == 'high'
+            ? AidPriority.high
+            : urgency == 'low'
+                ? AidPriority.low
+                : AidPriority.medium;
+
+        final adminRequest = AidRequestAdmin(
+          id: response.data?.id ?? 'AID-${DateTime.now().millisecondsSinceEpoch}',
+          priority: priority,
+          status: AidStatus.pending,
+          requesterName: 'Citizen',
+          resources: [_primaryResource ?? 'Aid'],
+          peopleCount: int.parse(_numberOfPeopleController.text.trim()),
+          location: _exactLocationController.text.trim(),
+          latitude: position.latitude,
+          longitude: position.longitude,
+          timestamp: DateTime.now(),
+        );
+
+        final route = adminProvider.intakeAidRequest(adminRequest);
+        final areaMessage = route.areaId == 'UNASSIGNED'
+            ? 'No active area found for this location.'
+            : 'Assigned Area: ${route.areaId}'
+                '${route.insideControllable ? '' : ' (outside controllable boundary)'}';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(areaMessage),
+            backgroundColor: AppConstants.primaryColor,
+          ),
+        );
+
+        _showSuccessDialog(areaMessage);
       } else {
         _showErrorDialog(response.message);
       }
@@ -641,7 +677,7 @@ Additional Details: ${_additionalDetailsController.text.isEmpty ? 'None' : _addi
     }
   }
 
-  void _showSuccessDialog() {
+  void _showSuccessDialog(String areaMessage) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -652,8 +688,8 @@ Additional Details: ${_additionalDetailsController.text.isEmpty ? 'None' : _addi
             Text('Request Submitted'),
           ],
         ),
-        content: const Text(
-          'Your aid request has been submitted successfully. Help will be dispatched to your location.',
+        content: Text(
+          'Your aid request has been submitted successfully. Help will be dispatched to your location.\n\n$areaMessage',
         ),
         actions: [
           ElevatedButton(

@@ -32,71 +32,68 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AdminProvider(),
-      child: Consumer<AdminProvider>(
-        builder: (context, adminProvider, child) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('Admin Dashboard'),
-              backgroundColor: AppConstants.primaryColor,
-              foregroundColor: Colors.white,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.logout),
-                  onPressed: () => Navigator.of(context).pop(),
-                  tooltip: 'Logout',
-                ),
-              ],
-            ),
-            body: PageStorage(
-              bucket: _bucket,
-              child: IndexedStack(
-                index: _currentIndex,
-                children: _tabs,
-              ),
-            ),
-            bottomNavigationBar: BottomNavigationBar(
-              currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
-              type: BottomNavigationBarType.fixed,
-              selectedItemColor: AppConstants.primaryColor,
-              unselectedItemColor: Colors.grey,
-              selectedFontSize: 12,
-              unselectedFontSize: 12,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.dashboard),
-                  label: 'Overview',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.map),
-                  label: 'Map',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.sos),
-                  label: 'SOS',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.help_outline),
-                  label: 'Aid',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.history),
-                  label: 'History',
-                ),
-              ],
-            ),
-            floatingActionButton: _currentIndex == 0
-                ? FloatingActionButton(
-                    onPressed: () => _showCommunicationLog(context, adminProvider),
-                    backgroundColor: AppConstants.primaryColor,
-                    child: const Icon(Icons.message, color: Colors.white),
-                  )
-                : null,
-          );
-        },
+    final adminProvider = context.watch<AdminProvider>();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Admin Dashboard'),
+        backgroundColor: AppConstants.primaryColor,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () {
+              adminProvider.logoutAdmin();
+              Navigator.of(context).pop();
+            },
+            tooltip: 'Logout',
+          ),
+        ],
       ),
+      body: PageStorage(
+        bucket: _bucket,
+        child: IndexedStack(
+          index: _currentIndex,
+          children: _tabs,
+        ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppConstants.primaryColor,
+        unselectedItemColor: Colors.grey,
+        selectedFontSize: 12,
+        unselectedFontSize: 12,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Overview',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.sos),
+            label: 'SOS',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.help_outline),
+            label: 'Aid',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: 'History',
+          ),
+        ],
+      ),
+      floatingActionButton: _currentIndex == 0
+          ? FloatingActionButton(
+              onPressed: () => _showCommunicationLog(context, adminProvider),
+              backgroundColor: AppConstants.primaryColor,
+              child: const Icon(Icons.message, color: Colors.white),
+            )
+          : null,
     );
   }
 
