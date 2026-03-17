@@ -25,6 +25,7 @@ class AidRequestAdmin {
   final DateTime timestamp;
   final String areaId;
   final bool insideControllableZone;
+  final String? details;
 
   AidRequestAdmin({
     required this.id,
@@ -39,6 +40,7 @@ class AidRequestAdmin {
     required this.timestamp,
     this.areaId = 'UNASSIGNED',
     this.insideControllableZone = false,
+    this.details,
   });
 
   /// Create from JSON
@@ -63,6 +65,7 @@ class AidRequestAdmin {
       areaId: (json['areaId'] as String?) ?? 'UNASSIGNED',
       insideControllableZone:
           (json['insideControllableZone'] as bool?) ?? false,
+      details: json['details'] as String?,
     );
   }
 
@@ -81,6 +84,7 @@ class AidRequestAdmin {
       'timestamp': timestamp.toIso8601String(),
       'areaId': areaId,
       'insideControllableZone': insideControllableZone,
+      'details': details,
     };
   }
 
@@ -126,6 +130,7 @@ class AidRequestAdmin {
     DateTime? timestamp,
     String? areaId,
     bool? insideControllableZone,
+    String? details,
   }) {
     return AidRequestAdmin(
       id: id ?? this.id,
@@ -141,6 +146,7 @@ class AidRequestAdmin {
       areaId: areaId ?? this.areaId,
       insideControllableZone:
           insideControllableZone ?? this.insideControllableZone,
+      details: details ?? this.details,
     );
   }
 }

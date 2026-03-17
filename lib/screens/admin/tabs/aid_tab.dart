@@ -113,6 +113,14 @@ class AidTab extends StatelessWidget {
                             'Coordinates',
                             aid.coordinates,
                           ),
+                          if ((aid.details ?? '').trim().isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _buildDetailRow(
+                              Icons.notes,
+                              'Details',
+                              aid.details!.trim(),
+                            ),
+                          ],
 
                           // Action Button or Status
                           const SizedBox(height: 16),

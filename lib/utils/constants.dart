@@ -70,12 +70,15 @@ class AppConstants {
   static const String sosEndpoint = '/api/sos';
   static const String aidRequestEndpoint = '/api/aid-request';
   static const String zonesEndpoint = '/api/zones';
+  static const String aidRequestsEndpoint = '/aid-requests';
+  static const String sosRequestsEndpoint = '/sos-requests';
+  static const String areasEndpoint = '/areas';
 
   // Disaster System (FastAPI Agent Backend)
-  // For Android emulator: 10.0.2.2 maps to your PC's localhost
-  // For physical device: replace with your PC's local IP (e.g. 192.168.x.x)
+  // For Android emulator: http://10.0.2.2:8000 maps to your PC's localhost
+  // For physical device: replace with your PC's local IP (e.g. http://192.168.x.x:8000)
   // For Windows desktop Flutter: use 'http://localhost:8000'
-  static const String disasterSystemUrl = 'http://10.0.2.2:8000';
+  static const String disasterSystemUrl = 'http://192.168.55.104:8000';
 
   // Emergency Contacts
   static const String policeNumber = '100';

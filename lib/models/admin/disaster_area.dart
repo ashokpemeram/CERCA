@@ -21,6 +21,36 @@ class DisasterArea {
     this.closedAt,
   });
 
+  factory DisasterArea.fromJson(Map<String, dynamic> json) {
+    return DisasterArea(
+      id: json['id'] as String,
+      centerLat: (json['centerLat'] as num).toDouble(),
+      centerLon: (json['centerLon'] as num).toDouble(),
+      redRadiusM: (json['redRadiusM'] as num).toDouble(),
+      warningRadiusM: (json['warningRadiusM'] as num).toDouble(),
+      greenRadiusM: (json['greenRadiusM'] as num).toDouble(),
+      controllableRadiusM: (json['controllableRadiusM'] as num).toDouble(),
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      closedAt: json['closedAt'] != null
+          ? DateTime.parse(json['closedAt'] as String)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'centerLat': centerLat,
+      'centerLon': centerLon,
+      'redRadiusM': redRadiusM,
+      'warningRadiusM': warningRadiusM,
+      'greenRadiusM': greenRadiusM,
+      'controllableRadiusM': controllableRadiusM,
+      'createdAt': createdAt.toIso8601String(),
+      'closedAt': closedAt?.toIso8601String(),
+    };
+  }
+
   bool get isActive => closedAt == null;
 
   DisasterArea copyWith({
