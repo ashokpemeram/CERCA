@@ -25,7 +25,7 @@ class LocationProvider with ChangeNotifier {
   Future<void> initialize() async {
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    // don't call notifyListeners() here to avoid build-phase state changes
 
     try {
       // Handle permission

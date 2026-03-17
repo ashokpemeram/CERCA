@@ -13,6 +13,7 @@ import '../models/admin/disaster_area.dart';
 import '../models/admin/disaster_event.dart';
 import '../services/admin_data_service.dart';
 import '../services/disaster_area_service.dart';
+import '../services/api_service.dart';
 
 /// System status enumeration
 enum SystemStatus {
@@ -281,6 +282,10 @@ class AdminProvider with ChangeNotifier {
     _loggedInEmail = normalizedEmail;
     _loggedInAreaId = areaId;
     _loginError = null;
+    
+    // Fetch live weather immediately for this area
+    fetchLiveWeatherForArea();
+    
     notifyListeners();
     return true;
   }
@@ -769,9 +774,76 @@ class AdminProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Fetch live weather readings for the current active area from the backend
+  Future<void> fetchLiveWeatherForArea() async {
+    final area = currentArea;
+    if (area == null) {
+      // No active area, use mock data
+      _sensorReadings = AdminDataService.getSensorReadings();
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final apiService = ApiService();
+      // Pass area coordinates to backend for accurate weather
+      final response = await apiService.fetchLiveWeatherReadings(
+        area.id,
+        latitude: area.centerLat,
+        longitude: area.centerLon,
+      );
+
+      if (response.success && response.data != null) {
+        debugPrint('AdminProvider: Successfully fetched ${response.data!.length} sensor readings');
+        // Convert API response to SensorReading objects
+        final readingsList = response.data!;
+        _sensorReadings = readingsList.map((reading) {
+          return SensorReading(
+            type: reading['type'] ?? 'Unknown',
+            value: (reading['value'] as num?)?.toDouble() ?? 0.0,
+            unit: reading['unit'] ?? '',
+            trend: SensorTrend.values.firstWhere(
+              (e) => e.name == reading['trend'],
+              orElse: () => SensorTrend.stable,
+            ),
+            timestamp: reading['timestamp'] != null
+                ? DateTime.parse(reading['timestamp'] as String)
+                : DateTime.now(),
+          );
+        }).toList();
+      } else {
+        debugPrint('AdminProvider: API returned no data or failed: ${response.message}. Using mock data.');
+        // API returned no data, use mock data
+        _sensorReadings = AdminDataService.getSensorReadings();
+      }
+    } catch (e) {
+      debugPrint('AdminProvider: Error fetching live weather: $e. Falling back to mock data.');
+      // On error, fall back to mock data
+      _sensorReadings = AdminDataService.getSensorReadings();
+    }
+
+    notifyListeners();
+    
+    // Schedule next fetch if not already scheduled
+    _startWeatherRefreshTimer();
+  }
+
+  Timer? _weatherRefreshTimer;
+  
+  void _startWeatherRefreshTimer() {
+    if (_weatherRefreshTimer != null && _weatherRefreshTimer!.isActive) return;
+    
+    _weatherRefreshTimer = Timer(const Duration(seconds: 30), () {
+      if (_loggedInAreaId != null) {
+        fetchLiveWeatherForArea();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _simulationTimer?.cancel();
+    _weatherRefreshTimer?.cancel();
     super.dispose();
   }
 }

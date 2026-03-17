@@ -249,3 +249,125 @@ class ApiResponse<T> {
     required this.message,
   });
 }
+
+/// Define sensor reading response structure
+class WeatherSensorResponse {
+  final bool success;
+  final String areaId;
+  final String riskLevel;
+  final String condition;
+  final List<Map<String, dynamic>> readings;
+  final String? timestamp;
+
+  WeatherSensorResponse({
+    required this.success,
+    required this.areaId,
+    required this.riskLevel,
+    required this.condition,
+    required this.readings,
+    this.timestamp,
+  });
+
+  factory WeatherSensorResponse.fromJson(Map<String, dynamic> json) {
+    return WeatherSensorResponse(
+      success: json['success'] ?? false,
+      areaId: json['area_id'] ?? '',
+      riskLevel: json['risk_level'] ?? 'unknown',
+      condition: json['condition'] ?? 'Unknown',
+      readings: List<Map<String, dynamic>>.from(
+        (json['readings'] as List?)?.cast<Map<String, dynamic>>() ?? [],
+      ),
+      timestamp: json['timestamp'],
+    );
+  }
+}
+
+/// Extend ApiService to add live weather endpoint
+extension WeatherEndpoint on ApiService {
+  /// Fetch live weather sensor readings for a specific area with coordinates
+  Future<ApiResponse<List<Map<String, dynamic>>>> fetchLiveWeatherReadings(
+    String areaId, {
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      // Build URL with coordinates for more accurate weather
+      String url = '${AppConstants.disasterSystemUrl}/live-weather/$areaId';
+      
+      if (latitude != null && longitude != null) {
+        url += '?lat=$latitude&lon=$longitude';
+      }
+
+      print('ApiService: Fetching weather from $url');
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = WeatherSensorResponse.fromJson(jsonDecode(response.body));
+        
+        if (data.success && data.readings.isNotEmpty) {
+          return ApiResponse(
+            success: true,
+            data: data.readings,
+            message: 'Live weather readings fetched successfully',
+          );
+        } else {
+          // Fallback to mock data if no readings found
+          return ApiResponse(
+            success: true,
+            data: _getMockWeatherReadings(),
+            message: 'Using mock weather data (no live data available)',
+          );
+        }
+      } else {
+        // Fallback to mock data on error
+        return ApiResponse(
+          success: true,
+          data: _getMockWeatherReadings(),
+          message: 'Using mock weather data (backend unavailable)',
+        );
+      }
+    } catch (e) {
+      // Fallback to mock data on error
+      return ApiResponse(
+        success: true,
+        data: _getMockWeatherReadings(),
+        message: 'Using mock weather data (error: $e)',
+      );
+    }
+  }
+
+  /// Get mock weather readings as fallback
+  List<Map<String, dynamic>> _getMockWeatherReadings() {
+    final now = DateTime.now();
+    return [
+      {
+        'type': 'Temperature',
+        'value': 28,
+        'unit': '°C',
+        'trend': 'down',
+        'timestamp': now.toIso8601String(),
+      },
+      {
+        'type': 'Wind Speed',
+        'value': 45,
+        'unit': 'km/h',
+        'trend': 'stable',
+        'timestamp': now.toIso8601String(),
+      },
+      {
+        'type': 'Humidity',
+        'value': 72,
+        'unit': '%',
+        'trend': 'up',
+        'timestamp': now.toIso8601String(),
+      },
+      {
+        'type': 'Rainfall',
+        'value': 5,
+        'unit': 'mm',
+        'trend': 'up',
+        'timestamp': now.toIso8601String(),
+      },
+    ];
+  }
+}

@@ -73,9 +73,9 @@ class AppConstants {
 
   // Disaster System (FastAPI Agent Backend)
   // For Android emulator: 10.0.2.2 maps to your PC's localhost
-  // For physical device: replace with your PC's local IP (e.g. 192.168.x.x)
+  // For physical device: replace with your PC's local IP (e.g. http://192.168.x.x:8000)
   // For Windows desktop Flutter: use 'http://localhost:8000'
-  static const String disasterSystemUrl = 'http://10.0.2.2:8000';
+  static const String disasterSystemUrl = 'http://localhost:8000';
 
   // Emergency Contacts
   static const String policeNumber = '100';
