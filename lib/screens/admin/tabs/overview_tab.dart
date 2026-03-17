@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/admin_provider.dart';
 import '../../../providers/location_provider.dart';
@@ -23,6 +23,16 @@ class _OverviewTabState extends State<OverviewTab> {
   final TextEditingController _boatsController = TextEditingController();
   final TextEditingController _foodPacketsController = TextEditingController();
   final TextEditingController _medicalKitsController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch live weather readings for the current area
+    Future.microtask(() {
+      final adminProvider = context.read<AdminProvider>();
+      adminProvider.fetchLiveWeatherForArea();
+    });
+  }
 
   @override
   void dispose() {
