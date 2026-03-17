@@ -15,6 +15,7 @@ class SosTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AdminProvider>(
       builder: (context, adminProvider, child) {
+        final sosRequests = adminProvider.sosRequestsForAdminView;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -42,9 +43,9 @@ class SosTab extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                itemCount: adminProvider.sosRequests.length,
+                itemCount: sosRequests.length,
                 itemBuilder: (context, index) {
-                  final sos = adminProvider.sosRequests[index];
+                  final sos = sosRequests[index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: InfoCard(
@@ -62,9 +63,19 @@ class SosTab extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
+                              if (sos.source == 'simulation') ...[
+                                StatusChip.info('Simulation'),
+                                const SizedBox(width: 8),
+                              ],
+                              StatusChip.info(sos.areaId),
+                              const SizedBox(width: 8),
                               sos.status == SosStatus.pending
                                   ? StatusChip.warning('Pending')
                                   : StatusChip.success('Dispatched'),
+                              if (!sos.insideControllableZone) ...[
+                                const SizedBox(width: 8),
+                                StatusChip.danger('Outside boundary'),
+                              ],
                               const Spacer(),
                               Text(
                                 DateFormat('HH:mm').format(sos.timestamp),
@@ -102,18 +113,25 @@ class SosTab extends StatelessWidget {
                           // Action Button or Status
                           const SizedBox(height: 16),
                           if (sos.status == SosStatus.pending)
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    adminProvider.dispatchRescueTeam(sos.id),
-                                icon: const Icon(Icons.local_shipping),
-                                label: const Text('DISPATCH RESCUE TEAM'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppConstants.dangerColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
+                            Tooltip(
+                              message: sos.insideControllableZone
+                                  ? 'Dispatch rescue team'
+                                  : 'Outside controllable boundary',
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: sos.insideControllableZone
+                                      ? () => adminProvider
+                                          .dispatchRescueTeam(sos.id)
+                                      : null,
+                                  icon: const Icon(Icons.local_shipping),
+                                  label: const Text('DISPATCH RESCUE TEAM'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppConstants.dangerColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
                                   ),
                                 ),
                               ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/admin_provider.dart';
 import '../../utils/constants.dart';
 import 'admin_dashboard.dart';
 
@@ -14,13 +16,16 @@ class _AdminLoginState extends State<AdminLogin> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _areaIdController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
+  String? _areaLoginError;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _areaIdController.dispose();
     super.dispose();
   }
 
@@ -131,6 +136,39 @@ class _AdminLoginState extends State<AdminLogin> {
                 ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
+                // Area ID Field
+                TextFormField(
+                  controller: _areaIdController,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: 'Area ID',
+                    prefixIcon: const Icon(Icons.map),
+                    errorText: _areaLoginError,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.borderRadiusMedium,
+                      ),
+                    ),
+                  ),
+                  onChanged: (_) {
+                    if (_areaLoginError != null) {
+                      setState(() => _areaLoginError = null);
+                    }
+                  },
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter Area ID';
+                    }
+                    final trimmed = value.trim();
+                    final regex = RegExp(r'^AREA-\d{8}-[A-Z0-9]{4}$');
+                    if (!regex.hasMatch(trimmed)) {
+                      return 'Area ID must match AREA-YYYYMMDD-XXXX';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppConstants.paddingLarge),
+
                 // Login Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
@@ -179,12 +217,34 @@ class _AdminLoginState extends State<AdminLogin> {
     // Simulate API call
     await Future.delayed(const Duration(seconds: 1));
 
-    setState(() => _isLoading = false);
+    if (!mounted) return;
+
+    final adminProvider = context.read<AdminProvider>();
+    await adminProvider.refreshAreasFromBackend();
+    final success = adminProvider.loginToArea(
+      _emailController.text,
+      _areaIdController.text.trim(),
+    );
+
+    if (!success) {
+      setState(() {
+        _isLoading = false;
+        _areaLoginError = adminProvider.loginError;
+      });
+      return;
+    }
+
+    await adminProvider.refreshAidRequestsForLoggedInArea();
+    await adminProvider.refreshSosRequestsForLoggedInArea();
 
     if (!mounted) return;
 
+    setState(() {
+      _isLoading = false;
+      _areaLoginError = null;
+    });
+
     // Mock authentication - accept any credentials for demo
-    // In production, validate against actual backend
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => const AdminDashboard(),

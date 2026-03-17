@@ -15,6 +15,7 @@ class AidTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<AdminProvider>(
       builder: (context, adminProvider, child) {
+        final aidRequests = adminProvider.aidRequestsForCurrentArea;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -42,9 +43,9 @@ class AidTab extends StatelessWidget {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.all(AppConstants.paddingMedium),
-                itemCount: adminProvider.aidRequests.length,
+                itemCount: aidRequests.length,
                 itemBuilder: (context, index) {
-                  final aid = adminProvider.aidRequests[index];
+                  final aid = aidRequests[index];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: InfoCard(
@@ -62,11 +63,17 @@ class AidTab extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 8),
+                              StatusChip.info(aid.areaId),
+                              const SizedBox(width: 8),
                               _getPriorityChip(aid.priority),
                               const SizedBox(width: 8),
                               aid.status == AidStatus.pending
                                   ? StatusChip.warning('Pending')
                                   : StatusChip.success('Dispatched'),
+                              if (!aid.insideControllableZone) ...[
+                                const SizedBox(width: 8),
+                                StatusChip.danger('Outside boundary'),
+                              ],
                               const Spacer(),
                               Text(
                                 DateFormat('HH:mm').format(aid.timestamp),
@@ -106,22 +113,38 @@ class AidTab extends StatelessWidget {
                             'Coordinates',
                             aid.coordinates,
                           ),
+                          if ((aid.details ?? '').trim().isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _buildDetailRow(
+                              Icons.notes,
+                              'Details',
+                              aid.details!.trim(),
+                            ),
+                          ],
 
                           // Action Button or Status
                           const SizedBox(height: 16),
                           if (aid.status == AidStatus.pending)
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: () =>
-                                    adminProvider.dispatchAid(aid.id),
-                                icon: const Icon(Icons.send),
-                                label: const Text('DISPATCH AID'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppConstants.primaryColor,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
+                            Tooltip(
+                              message: aid.insideControllableZone
+                                  ? 'Dispatch aid'
+                                  : 'Outside controllable boundary',
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: aid.insideControllableZone
+                                      ? () =>
+                                          adminProvider.dispatchAid(aid.id)
+                                      : null,
+                                  icon: const Icon(Icons.send),
+                                  label: const Text('DISPATCH AID'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        AppConstants.primaryColor,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                    ),
                                   ),
                                 ),
                               ),

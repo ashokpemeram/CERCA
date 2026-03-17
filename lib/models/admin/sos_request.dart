@@ -15,6 +15,10 @@ class SosRequest {
   final double longitude;
   final DateTime timestamp;
   final String? eta;
+  final String areaId;
+  final bool insideControllableZone;
+  final String source;
+  final String? disasterId;
 
   SosRequest({
     required this.id,
@@ -26,6 +30,10 @@ class SosRequest {
     required this.longitude,
     required this.timestamp,
     this.eta,
+    this.areaId = 'UNASSIGNED',
+    this.insideControllableZone = false,
+    this.source = 'citizen',
+    this.disasterId,
   });
 
   /// Create from JSON
@@ -43,6 +51,11 @@ class SosRequest {
       longitude: (json['longitude'] as num).toDouble(),
       timestamp: DateTime.parse(json['timestamp'] as String),
       eta: json['eta'] as String?,
+      areaId: (json['areaId'] as String?) ?? 'UNASSIGNED',
+      insideControllableZone:
+          (json['insideControllableZone'] as bool?) ?? false,
+      source: (json['source'] as String?) ?? 'citizen',
+      disasterId: json['disasterId'] as String?,
     );
   }
 
@@ -58,6 +71,10 @@ class SosRequest {
       'longitude': longitude,
       'timestamp': timestamp.toIso8601String(),
       'eta': eta,
+      'areaId': areaId,
+      'insideControllableZone': insideControllableZone,
+      'source': source,
+      'disasterId': disasterId,
     };
   }
 
@@ -85,6 +102,10 @@ class SosRequest {
     double? longitude,
     DateTime? timestamp,
     String? eta,
+    String? areaId,
+    bool? insideControllableZone,
+    String? source,
+    String? disasterId,
   }) {
     return SosRequest(
       id: id ?? this.id,
@@ -96,6 +117,11 @@ class SosRequest {
       longitude: longitude ?? this.longitude,
       timestamp: timestamp ?? this.timestamp,
       eta: eta ?? this.eta,
+      areaId: areaId ?? this.areaId,
+      insideControllableZone:
+          insideControllableZone ?? this.insideControllableZone,
+      source: source ?? this.source,
+      disasterId: disasterId ?? this.disasterId,
     );
   }
 }

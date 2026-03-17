@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/location_provider.dart';
 import '../../services/api_service.dart';
+import '../../models/admin/sos_request.dart';
 import '../../widgets/sos_button.dart';
 import '../../utils/constants.dart';
 
@@ -147,18 +148,40 @@ class _SosTabState extends State<SosTab> {
         throw Exception('Location not available');
       }
 
-      // Send SOS alert
-      final response = await _apiService.sendSosAlert(
+      final sosRequest = SosRequest(
+        id: 'SOS-${DateTime.now().millisecondsSinceEpoch}',
+        status: SosStatus.pending,
+        callerName: 'Citizen',
+        phoneNumber: 'N/A',
+        address: 'GPS location',
         latitude: position.latitude,
         longitude: position.longitude,
-        message: 'Emergency SOS alert from CERCA app',
+        timestamp: DateTime.now(),
+        source: 'citizen',
       );
+
+      final response = await _apiService.submitSosRequest(sosRequest);
 
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
       if (response.success) {
+        final assigned = response.data;
+        final assignedAreaId = assigned?.areaId ?? 'UNASSIGNED';
+        final inside = assigned?.insideControllableZone ?? false;
+        final areaMessage = assignedAreaId == 'UNASSIGNED'
+            ? 'No active area found for this location.'
+            : 'Assigned Area: $assignedAreaId'
+                '${inside ? '' : ' (outside controllable boundary)'}';
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(areaMessage),
+            backgroundColor: AppConstants.primaryColor,
+          ),
+        );
+
         // Show success dialog
         showDialog(
           context: context,
@@ -170,8 +193,8 @@ class _SosTabState extends State<SosTab> {
                 Text('SOS Sent'),
               ],
             ),
-            content: const Text(
-              'Your emergency alert has been sent successfully. Help is on the way.',
+            content: Text(
+              'Your emergency alert has been sent successfully. Help is on the way.\n\n$areaMessage',
             ),
             actions: [
               ElevatedButton(

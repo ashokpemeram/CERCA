@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/admin_provider.dart';
+import '../../../providers/location_provider.dart';
 import '../../../utils/constants.dart';
 import '../../../widgets/admin/info_card.dart';
 import '../../../widgets/admin/metric_card.dart';
 import '../../../widgets/admin/agent_status_card.dart';
 import '../../../models/admin/sensor_reading.dart';
+import '../../../models/admin/disaster_event.dart';
 
 /// Overview tab for admin dashboard
 class OverviewTab extends StatefulWidget {
@@ -35,6 +37,7 @@ class _OverviewTabState extends State<OverviewTab> {
   Widget build(BuildContext context) {
     return Consumer<AdminProvider>(
       builder: (context, adminProvider, child) {
+        final simulation = adminProvider.activeSimulation;
         return SingleChildScrollView(
           padding: const EdgeInsets.all(AppConstants.paddingMedium),
           child: Column(
@@ -46,7 +49,7 @@ class _OverviewTabState extends State<OverviewTab> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: adminProvider.systemStatus == SystemStatus.normal
-                        ? [Colors.green[700]!, Colors.green[900]!]
+                              ? [Colors.green[700]!, Colors.green[900]!]
                         : [Colors.red[700]!, Colors.red[900]!],
                   ),
                   borderRadius: BorderRadius.circular(12),
@@ -70,14 +73,14 @@ class _OverviewTabState extends State<OverviewTab> {
                             color:
                                 adminProvider.systemStatus ==
                                     SystemStatus.normal
-                                ? Colors.green[300]
+                              ? Colors.green[300]
                                 : Colors.red[300],
                             boxShadow: [
                               BoxShadow(
                                 color:
                                     (adminProvider.systemStatus ==
                                                 SystemStatus.normal
-                                            ? Colors.green[300]
+                              ? Colors.green[300]
                                             : Colors.red[300])!
                                         .withOpacity(0.8),
                                 blurRadius: 8,
@@ -136,7 +139,7 @@ class _OverviewTabState extends State<OverviewTab> {
                     if (adminProvider.systemStatus != SystemStatus.normal) ...[
                       const SizedBox(height: 4),
                       Text(
-                        '${adminProvider.currentDisasterType?.toUpperCase() ?? 'DISASTER'} PROTOCOL ACTIVE • Response Teams Deployed',
+                        '${adminProvider.currentDisasterType?.toUpperCase() ?? 'DISASTER'} PROTOCOL ACTIVE - Response Teams Deployed',
                         style: TextStyle(
                           color:
                               adminProvider.systemStatus == SystemStatus.normal
@@ -146,6 +149,75 @@ class _OverviewTabState extends State<OverviewTab> {
                           letterSpacing: 0.5,
                         ),
                         textAlign: TextAlign.center,
+                      ),
+                    ],
+                    if (simulation != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'SIMULATION ${simulation.isActive ? 'RUNNING' : 'COMPLETE'} - '
+                        '${simulation.generatedCitizens}/${simulation.totalCitizens} SOS',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.85),
+                          fontSize: 10,
+                          letterSpacing: 0.5,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Area Control
+              InfoCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.map,
+                          size: 16,
+                          color: AppConstants.primaryColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'AREA CONTROL',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey[800],
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (adminProvider.currentArea == null)
+                      Text(
+                        'No active area selected.',
+                        style: AppConstants.bodyStyle.copyWith(fontSize: 12),
+                      )
+                    else ...[
+                      Text(
+                        'Active Area ID: ${adminProvider.currentArea!.id}',
+                        style: AppConstants.bodyStyle.copyWith(fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _confirmCloseArea(
+                          context,
+                          adminProvider,
+                          adminProvider.currentArea!.id,
+                        ),
+                        icon: const Icon(Icons.lock),
+                        label: const Text('Close Active Area'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppConstants.dangerColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ],
                   ],
@@ -630,6 +702,50 @@ class _OverviewTabState extends State<OverviewTab> {
     );
   }
 
+  void _confirmCloseArea(
+    BuildContext context,
+    AdminProvider adminProvider,
+    String areaId,
+  ) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Close Active Area'),
+        content: const Text(
+          'Closing this area will archive it and prevent new admin logins. '
+          'Existing logs remain visible for history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              adminProvider.closeArea(areaId);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text('Area closed and archived.'),
+                  backgroundColor: AppConstants.dangerColor,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppConstants.dangerColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Close Area'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAiSuggestionChip(String label, String value) {
     return Container(
       padding: const EdgeInsets.all(8),
@@ -697,149 +813,319 @@ class _OverviewTabState extends State<OverviewTab> {
     BuildContext context,
     AdminProvider adminProvider,
   ) {
+    final locationProvider = Provider.of<LocationProvider>(
+      context,
+      listen: false,
+    );
+    final position = locationProvider.currentPosition;
+
+    final latController = TextEditingController(
+      text: position != null ? position.latitude.toStringAsFixed(6) : '',
+    );
+    final lngController = TextEditingController(
+      text: position != null ? position.longitude.toStringAsFixed(6) : '',
+    );
+    final radiusController = TextEditingController(text: '2000');
+    final citizensController = TextEditingController(text: '25');
+    final intervalController = TextEditingController(text: '2');
+
+    String disasterType = adminProvider.currentDisasterType ?? 'Flood';
+    DisasterSeverity severity = DisasterSeverity.medium;
+
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.grey[800]!, Colors.grey[900]!],
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: const Column(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'INITIATE SIMULATION',
+                    'SIMULATE DISASTER',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Colors.grey[900],
                       letterSpacing: 1.0,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
-                    'Select disaster scenario for demo',
-                    style: TextStyle(fontSize: 11, color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _buildSimulationOption(
-                    context,
-                    adminProvider,
-                    'Coastal Flood',
-                    Icons.waves,
-                    Colors.blue,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildSimulationOption(
-                    context,
-                    adminProvider,
-                    'Cyclone',
-                    Icons.air,
-                    Colors.purple,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildSimulationOption(
-                    context,
-                    adminProvider,
-                    'Earthquake',
-                    Icons.landscape,
-                    Colors.brown,
-                  ),
-                  const SizedBox(height: 8),
-                  _buildSimulationOption(
-                    context,
-                    adminProvider,
-                    'Forest Fire',
-                    Icons.local_fire_department,
-                    Colors.orange,
+                    'Configure a realistic incident and stream SOS alerts over time.',
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 40),
-                      side: BorderSide(color: Colors.grey[400]!),
-                      shape: RoundedRectangleBorder(
+                  if (adminProvider.activeSimulation != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            size: 18,
+                            color: Colors.orange[700],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'A simulation is already running. Starting a new one will reset the current simulated data.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.orange[900],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: const Text('Cancel'),
+                    const SizedBox(height: 12),
+                  ],
+                  DropdownButtonFormField<String>(
+                    value: disasterType,
+                    decoration: const InputDecoration(
+                      labelText: 'Disaster Type',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Flood',
+                        child: Text('Flood'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Earthquake',
+                        child: Text('Earthquake'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Cyclone',
+                        child: Text('Cyclone'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Fire',
+                        child: Text('Fire'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => disasterType = value);
+                    },
                   ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<DisasterSeverity>(
+                    value: severity,
+                    decoration: const InputDecoration(
+                      labelText: 'Severity',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(
+                        value: DisasterSeverity.low,
+                        child: Text('Low'),
+                      ),
+                      DropdownMenuItem(
+                        value: DisasterSeverity.medium,
+                        child: Text('Medium'),
+                      ),
+                      DropdownMenuItem(
+                        value: DisasterSeverity.high,
+                        child: Text('High'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => severity = value);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: latController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Latitude',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: lngController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                            signed: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Longitude',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: position == null
+                          ? null
+                          : () {
+                              latController.text =
+                                  position.latitude.toStringAsFixed(6);
+                              lngController.text =
+                                  position.longitude.toStringAsFixed(6);
+                              setState(() {});
+                            },
+                      icon: const Icon(Icons.my_location, size: 16),
+                      label: const Text('Use current location'),
+                    ),
+                  ),
+                  TextField(
+                    controller: radiusController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Affected Radius (meters)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: citizensController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Simulated Citizens',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: intervalController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'SOS Interval (seconds)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(dialogContext),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            final lat = double.tryParse(
+                              latController.text.trim(),
+                            );
+                            final lon = double.tryParse(
+                              lngController.text.trim(),
+                            );
+                            final radius =
+                                double.tryParse(radiusController.text.trim()) ??
+                                0;
+                            final citizens =
+                                int.tryParse(citizensController.text.trim()) ??
+                                0;
+                            final intervalSeconds =
+                                int.tryParse(intervalController.text.trim()) ??
+                                0;
+
+                            if (lat == null || lon == null) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Enter valid coordinates.'),
+                                  backgroundColor: AppConstants.dangerColor,
+                                ),
+                              );
+                              return;
+                            }
+                            if (radius <= 0 || citizens <= 0) {
+                              ScaffoldMessenger.of(dialogContext).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Enter valid radius and count.'),
+                                  backgroundColor: AppConstants.dangerColor,
+                                ),
+                              );
+                              return;
+                            }
+
+                            final interval = intervalSeconds <= 0
+                                ? const Duration(seconds: 2)
+                                : Duration(seconds: intervalSeconds);
+
+                            adminProvider.startDisasterSimulation(
+                              type: disasterType,
+                              centerLat: lat,
+                              centerLon: lon,
+                              radiusM: radius,
+                              severity: severity,
+                              totalCitizens: citizens,
+                              interval: interval,
+                            );
+                            Navigator.pop(dialogContext);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '$disasterType simulation started.',
+                                ),
+                                backgroundColor: AppConstants.primaryColor,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppConstants.primaryColor,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Start Simulation'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (adminProvider.activeSimulation != null) ...[
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        adminProvider.stopSimulation();
+                        Navigator.pop(dialogContext);
+                      },
+                      icon: const Icon(Icons.stop),
+                      label: const Text('Stop Simulation'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppConstants.dangerColor,
+                        side: const BorderSide(color: AppConstants.dangerColor),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSimulationOption(
-    BuildContext context,
-    AdminProvider adminProvider,
-    String disasterType,
-    IconData icon,
-    Color color,
-  ) {
-    return InkWell(
-      onTap: () {
-        adminProvider.loadDummyScenario(disasterType);
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('$disasterType simulation initiated'),
-            backgroundColor: color,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey[300]!),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              disasterType.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -953,3 +1239,6 @@ class _OverviewTabState extends State<OverviewTab> {
     }
   }
 }
+
+
+

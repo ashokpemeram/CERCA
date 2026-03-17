@@ -23,6 +23,9 @@ class AidRequestAdmin {
   final double latitude;
   final double longitude;
   final DateTime timestamp;
+  final String areaId;
+  final bool insideControllableZone;
+  final String? details;
 
   AidRequestAdmin({
     required this.id,
@@ -35,6 +38,9 @@ class AidRequestAdmin {
     required this.latitude,
     required this.longitude,
     required this.timestamp,
+    this.areaId = 'UNASSIGNED',
+    this.insideControllableZone = false,
+    this.details,
   });
 
   /// Create from JSON
@@ -56,6 +62,10 @@ class AidRequestAdmin {
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       timestamp: DateTime.parse(json['timestamp'] as String),
+      areaId: (json['areaId'] as String?) ?? 'UNASSIGNED',
+      insideControllableZone:
+          (json['insideControllableZone'] as bool?) ?? false,
+      details: json['details'] as String?,
     );
   }
 
@@ -72,6 +82,9 @@ class AidRequestAdmin {
       'latitude': latitude,
       'longitude': longitude,
       'timestamp': timestamp.toIso8601String(),
+      'areaId': areaId,
+      'insideControllableZone': insideControllableZone,
+      'details': details,
     };
   }
 
@@ -115,6 +128,9 @@ class AidRequestAdmin {
     double? latitude,
     double? longitude,
     DateTime? timestamp,
+    String? areaId,
+    bool? insideControllableZone,
+    String? details,
   }) {
     return AidRequestAdmin(
       id: id ?? this.id,
@@ -127,6 +143,10 @@ class AidRequestAdmin {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       timestamp: timestamp ?? this.timestamp,
+      areaId: areaId ?? this.areaId,
+      insideControllableZone:
+          insideControllableZone ?? this.insideControllableZone,
+      details: details ?? this.details,
     );
   }
 }

@@ -12,7 +12,9 @@ class AppConstants {
   static const Color dangerColor = Color(0xFFD32F2F);
   static const Color safeColor = Color(0xFF388E3C);
   static const Color warningColor = Color(0xFFF57C00);
-  static const Color mediumRiskColor = Color(0xFFFF9800); // Orange for medium-risk zones
+  static const Color mediumRiskColor = Color(
+    0xFFFF9800,
+  ); // Orange for medium-risk zones
   static const Color backgroundColor = Color(0xFFF5F5F5);
   static const Color cardColor = Colors.white;
 
@@ -68,10 +70,13 @@ class AppConstants {
   static const String sosEndpoint = '/api/sos';
   static const String aidRequestEndpoint = '/api/aid-request';
   static const String zonesEndpoint = '/api/zones';
+  static const String aidRequestsEndpoint = '/aid-requests';
+  static const String sosRequestsEndpoint = '/sos-requests';
+  static const String areasEndpoint = '/areas';
 
   // Disaster System (FastAPI Agent Backend)
-  // For Android emulator: 10.0.2.2 maps to your PC's localhost
-  // For physical device: replace with your PC's local IP (e.g. 192.168.x.x)
+  // For Android emulator: http://10.0.2.2:8000 maps to your PC's localhost
+  // For physical device: replace with your PC's local IP (e.g. http://192.168.x.x:8000)
   // For Windows desktop Flutter: use 'http://localhost:8000'
   static const String disasterSystemUrl = 'http://192.168.55.104:8000';
 
