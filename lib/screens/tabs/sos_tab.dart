@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/location_provider.dart';
-import '../../providers/admin_provider.dart';
 import '../../services/api_service.dart';
 import '../../models/admin/sos_request.dart';
 import '../../widgets/sos_button.dart';
@@ -149,36 +148,32 @@ class _SosTabState extends State<SosTab> {
         throw Exception('Location not available');
       }
 
-      // Send SOS alert
-      final response = await _apiService.sendSosAlert(
+      final sosRequest = SosRequest(
+        id: 'SOS-${DateTime.now().millisecondsSinceEpoch}',
+        status: SosStatus.pending,
+        callerName: 'Citizen',
+        phoneNumber: 'N/A',
+        address: 'GPS location',
         latitude: position.latitude,
         longitude: position.longitude,
-        message: 'Emergency SOS alert from CERCA app',
+        timestamp: DateTime.now(),
+        source: 'citizen',
       );
+
+      final response = await _apiService.submitSosRequest(sosRequest);
 
       setState(() => _isLoading = false);
 
       if (!mounted) return;
 
       if (response.success) {
-        final adminProvider = context.read<AdminProvider>();
-        final sosRequest = SosRequest(
-          id: (response.data?['id'] as String?) ??
-              'SOS-${DateTime.now().millisecondsSinceEpoch}',
-          status: SosStatus.pending,
-          callerName: 'Citizen',
-          phoneNumber: 'N/A',
-          address: 'GPS location',
-          latitude: position.latitude,
-          longitude: position.longitude,
-          timestamp: DateTime.now(),
-          source: 'citizen',
-        );
-        final route = adminProvider.intakeSosRequest(sosRequest);
-        final areaMessage = route.areaId == 'UNASSIGNED'
+        final assigned = response.data;
+        final assignedAreaId = assigned?.areaId ?? 'UNASSIGNED';
+        final inside = assigned?.insideControllableZone ?? false;
+        final areaMessage = assignedAreaId == 'UNASSIGNED'
             ? 'No active area found for this location.'
-            : 'Assigned Area: ${route.areaId}'
-                '${route.insideControllable ? '' : ' (outside controllable boundary)'}';
+            : 'Assigned Area: $assignedAreaId'
+                '${inside ? '' : ' (outside controllable boundary)'}';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

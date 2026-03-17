@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/location_provider.dart';
-import '../../providers/admin_provider.dart';
-import '../../models/aid_request.dart';
 import '../../models/admin/aid_request_admin.dart';
 import '../../services/api_service.dart';
 import '../../utils/constants.dart';
@@ -609,9 +607,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
     setState(() => _isSubmitting = true);
 
     try {
-      final request = AidRequest(
-        resourceType: _primaryResource!,
-        description: '''
+      final details = '''
 Number of People: ${_numberOfPeopleController.text}
 Exact Location: ${_exactLocationController.text}
 Mobility Status: ${_mobilityStatus == 'can_reach' ? 'Can reach distribution point' : 'Need delivery to location'}
@@ -620,44 +616,43 @@ Supply Duration: $_supplyDuration
 Urgency Level: ${_urgencyLevel?.toUpperCase()}
 Medical/Special Needs: ${_medicalNeedsController.text.isEmpty ? 'None' : _medicalNeedsController.text}
 Additional Details: ${_additionalDetailsController.text.isEmpty ? 'None' : _additionalDetailsController.text}
-''',
+''';
+
+      final urgency = _urgencyLevel ?? 'medium';
+      final priority = urgency == 'high'
+          ? AidPriority.high
+          : urgency == 'low'
+              ? AidPriority.low
+              : AidPriority.medium;
+
+      final adminRequest = AidRequestAdmin(
+        id: 'AID-${DateTime.now().millisecondsSinceEpoch}',
+        priority: priority,
+        status: AidStatus.pending,
+        requesterName: 'Citizen',
+        resources: [_primaryResource ?? 'Aid'],
+        peopleCount: int.parse(_numberOfPeopleController.text.trim()),
+        location: _exactLocationController.text.trim(),
         latitude: position.latitude,
         longitude: position.longitude,
+        timestamp: DateTime.now(),
+        details: details.trim(),
       );
 
-      final response = await _apiService.submitAidRequest(request);
+      final response = await _apiService.submitAidRequestAdmin(adminRequest);
 
       setState(() => _isSubmitting = false);
 
       if (!mounted) return;
 
       if (response.success) {
-        final adminProvider = context.read<AdminProvider>();
-        final urgency = _urgencyLevel ?? 'medium';
-        final priority = urgency == 'high'
-            ? AidPriority.high
-            : urgency == 'low'
-                ? AidPriority.low
-                : AidPriority.medium;
-
-        final adminRequest = AidRequestAdmin(
-          id: response.data?.id ?? 'AID-${DateTime.now().millisecondsSinceEpoch}',
-          priority: priority,
-          status: AidStatus.pending,
-          requesterName: 'Citizen',
-          resources: [_primaryResource ?? 'Aid'],
-          peopleCount: int.parse(_numberOfPeopleController.text.trim()),
-          location: _exactLocationController.text.trim(),
-          latitude: position.latitude,
-          longitude: position.longitude,
-          timestamp: DateTime.now(),
-        );
-
-        final route = adminProvider.intakeAidRequest(adminRequest);
-        final areaMessage = route.areaId == 'UNASSIGNED'
+        final assigned = response.data;
+        final assignedAreaId = assigned?.areaId ?? 'UNASSIGNED';
+        final inside = assigned?.insideControllableZone ?? false;
+        final areaMessage = assignedAreaId == 'UNASSIGNED'
             ? 'No active area found for this location.'
-            : 'Assigned Area: ${route.areaId}'
-                '${route.insideControllable ? '' : ' (outside controllable boundary)'}';
+            : 'Assigned Area: $assignedAreaId'
+                '${inside ? '' : ' (outside controllable boundary)'}';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

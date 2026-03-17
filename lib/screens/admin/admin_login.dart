@@ -220,17 +220,29 @@ class _AdminLoginState extends State<AdminLogin> {
     if (!mounted) return;
 
     final adminProvider = context.read<AdminProvider>();
+    await adminProvider.refreshAreasFromBackend();
     final success = adminProvider.loginToArea(
       _emailController.text,
       _areaIdController.text.trim(),
     );
 
+    if (!success) {
+      setState(() {
+        _isLoading = false;
+        _areaLoginError = adminProvider.loginError;
+      });
+      return;
+    }
+
+    await adminProvider.refreshAidRequestsForLoggedInArea();
+    await adminProvider.refreshSosRequestsForLoggedInArea();
+
+    if (!mounted) return;
+
     setState(() {
       _isLoading = false;
-      _areaLoginError = success ? null : adminProvider.loginError;
+      _areaLoginError = null;
     });
-
-    if (!success || !mounted) return;
 
     // Mock authentication - accept any credentials for demo
     Navigator.of(context).pushReplacement(

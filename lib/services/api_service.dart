@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/aid_request.dart';
+import '../models/admin/aid_request_admin.dart';
+import '../models/admin/sos_request.dart';
+import '../models/admin/disaster_area.dart';
 import '../utils/constants.dart';
 
 /// Service for API communication
@@ -10,6 +13,7 @@ class ApiService {
   ApiService._internal();
 
   final String _baseUrl = AppConstants.baseUrl;
+  final String _disasterBaseUrl = AppConstants.disasterSystemUrl;
 
   /// Send SOS alert
   Future<ApiResponse<Map<String, dynamic>>> sendSosAlert({
@@ -69,6 +73,118 @@ class ApiService {
     }
   }
 
+  /// Submit SOS request to backend
+  Future<ApiResponse<SosRequest>> submitSosRequest(SosRequest request) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_disasterBaseUrl${AppConstants.sosRequestsEndpoint}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(request.toJson()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: SosRequest.fromJson(data),
+          message: 'SOS alert sent successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: 'Failed to send SOS alert: ${response.statusCode}',
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error sending SOS alert: $e',
+      );
+    }
+  }
+
+  /// Fetch SOS requests filtered by area id
+  Future<ApiResponse<List<SosRequest>>> fetchSosRequestsForArea(
+    String areaId,
+  ) async {
+    try {
+      final uri = Uri.parse(
+        '$_disasterBaseUrl${AppConstants.sosRequestsEndpoint}',
+      ).replace(
+        queryParameters: {'area_id': areaId},
+      );
+
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        final items = data
+            .map(
+              (item) => SosRequest.fromJson(
+                item as Map<String, dynamic>,
+              ),
+            )
+            .toList();
+
+        return ApiResponse(
+          success: true,
+          data: items,
+          message: 'SOS requests fetched successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: 'Failed to fetch SOS requests: ${response.statusCode}',
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error fetching SOS requests: $e',
+      );
+    }
+  }
+
+  /// Fetch active disaster areas from backend
+  Future<ApiResponse<List<DisasterArea>>> fetchActiveAreas() async {
+    try {
+      final uri = Uri.parse(
+        '$_disasterBaseUrl${AppConstants.areasEndpoint}',
+      ).replace(
+        queryParameters: {'active': 'true'},
+      );
+
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        final items = data
+            .map(
+              (item) => DisasterArea.fromJson(
+                item as Map<String, dynamic>,
+              ),
+            )
+            .toList();
+
+        return ApiResponse(
+          success: true,
+          data: items,
+          message: 'Areas fetched successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: 'Failed to fetch areas: ${response.statusCode}',
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error fetching areas: $e',
+      );
+    }
+  }
+
   /// Submit aid request
   Future<ApiResponse<AidRequest>> submitAidRequest(AidRequest request) async {
     try {
@@ -113,6 +229,80 @@ class ApiService {
       return ApiResponse(
         success: false,
         message: 'Error submitting aid request: $e',
+      );
+    }
+  }
+
+  /// Submit aid request with area assignment for admin view
+  Future<ApiResponse<AidRequestAdmin>> submitAidRequestAdmin(
+    AidRequestAdmin request,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_disasterBaseUrl${AppConstants.aidRequestsEndpoint}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(request.toJson()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: AidRequestAdmin.fromJson(data),
+          message: 'Aid request submitted successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: 'Failed to submit aid request: ${response.statusCode}',
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error submitting aid request: $e',
+      );
+    }
+  }
+
+  /// Fetch aid requests filtered by area id
+  Future<ApiResponse<List<AidRequestAdmin>>> fetchAidRequestsForArea(
+    String areaId,
+  ) async {
+    try {
+      final uri = Uri.parse(
+        '$_disasterBaseUrl${AppConstants.aidRequestsEndpoint}',
+      ).replace(
+        queryParameters: {'area_id': areaId},
+      );
+
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        final items = data
+            .map(
+              (item) => AidRequestAdmin.fromJson(
+                item as Map<String, dynamic>,
+              ),
+            )
+            .toList();
+
+        return ApiResponse(
+          success: true,
+          data: items,
+          message: 'Aid requests fetched successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: 'Failed to fetch aid requests: ${response.statusCode}',
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error fetching aid requests: $e',
       );
     }
   }

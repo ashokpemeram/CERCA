@@ -12,6 +12,7 @@ import '../models/admin/communication_log.dart';
 import '../models/admin/disaster_area.dart';
 import '../models/admin/disaster_event.dart';
 import '../services/admin_data_service.dart';
+import '../services/api_service.dart';
 import '../services/disaster_area_service.dart';
 import '../services/api_service.dart';
 
@@ -24,6 +25,7 @@ enum SystemStatus {
 
 /// Provider for admin dashboard state management
 class AdminProvider with ChangeNotifier {
+  final ApiService _apiService = ApiService();
   // System status
   SystemStatus _systemStatus = SystemStatus.normal;
   SystemStatus get systemStatus => _systemStatus;
@@ -138,6 +140,43 @@ class AdminProvider with ChangeNotifier {
     _communicationLogs = AdminDataService.getCommunicationLogs();
     _updateNotificationCount();
     notifyListeners();
+  }
+
+  /// Load active areas from backend
+  Future<void> refreshAreasFromBackend() async {
+    final response = await _apiService.fetchActiveAreas();
+    if (response.success && response.data != null) {
+      _activeAreas = response.data!;
+      _archivedAreas = [];
+      _syncLoginToActiveAreas();
+      notifyListeners();
+    }
+  }
+
+  /// Load aid requests for the currently logged-in area from backend
+  Future<void> refreshAidRequestsForLoggedInArea() async {
+    final areaId = _loggedInAreaId;
+    if (areaId == null) return;
+
+    final response = await _apiService.fetchAidRequestsForArea(areaId);
+    if (response.success && response.data != null) {
+      _aidRequests = response.data!;
+      _updateNotificationCount();
+      notifyListeners();
+    }
+  }
+
+  /// Load SOS requests for the currently logged-in area from backend
+  Future<void> refreshSosRequestsForLoggedInArea() async {
+    final areaId = _loggedInAreaId;
+    if (areaId == null) return;
+
+    final response = await _apiService.fetchSosRequestsForArea(areaId);
+    if (response.success && response.data != null) {
+      _sosRequests = response.data!;
+      _updateNotificationCount();
+      notifyListeners();
+    }
   }
 
   /// Update notification count based on pending requests
