@@ -16,6 +16,8 @@ class RequestAidTab extends StatefulWidget {
 
 class _RequestAidTabState extends State<RequestAidTab> {
   final _formKey = GlobalKey<FormState>();
+  final _requesterNameController = TextEditingController();
+  final _mobileNumberController = TextEditingController();
   final _numberOfPeopleController = TextEditingController();
   final _exactLocationController = TextEditingController();
   final _medicalNeedsController = TextEditingController();
@@ -30,6 +32,8 @@ class _RequestAidTabState extends State<RequestAidTab> {
 
   @override
   void dispose() {
+    _requesterNameController.dispose();
+    _mobileNumberController.dispose();
     _numberOfPeopleController.dispose();
     _exactLocationController.dispose();
     _medicalNeedsController.dispose();
@@ -86,7 +90,62 @@ class _RequestAidTabState extends State<RequestAidTab> {
                 ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 1. Number of People
+                // 1. Contact Details
+                Text(
+                  'CONTACT DETAILS (OPTIONAL)',
+                  style: AppConstants.subheadingStyle.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: AppConstants.paddingSmall),
+                TextFormField(
+                  controller: _requesterNameController,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    hintText: 'Your name',
+                    helperText: 'Leave blank to submit anonymously as Citizen',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.borderRadiusMedium,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                ),
+                const SizedBox(height: AppConstants.paddingMedium),
+                TextFormField(
+                  controller: _mobileNumberController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    hintText: 'Mobile number',
+                    helperText: 'Optional, for follow-up contact if needed',
+                    prefixIcon: const Icon(Icons.phone_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppConstants.borderRadiusMedium,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  validator: (value) {
+                    final trimmed = value?.trim() ?? '';
+                    if (trimmed.isEmpty) {
+                      return null;
+                    }
+                    if (!Helpers.isValidPhoneNumber(trimmed)) {
+                      return 'Please enter a valid mobile number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppConstants.paddingLarge),
+
+                // 2. Number of People
                 Text(
                   'NUMBER OF PEOPLE',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -125,7 +184,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
                 ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 2. Exact Location
+                // 3. Exact Location
                 Text(
                   'EXACT LOCATION',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -195,7 +254,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
                 ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 3. Mobility Status
+                // 4. Mobility Status
                 Text(
                   'MOBILITY STATUS',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -279,7 +338,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
                   ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 4. Primary Resource Needed
+                // 5. Primary Resource Needed
                 Text(
                   'PRIMARY RESOURCE NEEDED',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -324,7 +383,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
                 ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 5. Supply Duration Needed
+                // 6. Supply Duration Needed
                 Text(
                   'SUPPLY DURATION NEEDED',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -367,7 +426,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
                 ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 6. Urgency Level
+                // 7. Urgency Level
                 Text(
                   'URGENCY LEVEL',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -480,7 +539,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
                   ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 7. Medical or Special Needs
+                // 8. Medical or Special Needs
                 Text(
                   'MEDICAL OR SPECIAL NEEDS',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -506,7 +565,7 @@ class _RequestAidTabState extends State<RequestAidTab> {
                 ),
                 const SizedBox(height: AppConstants.paddingLarge),
 
-                // 8. Additional Details
+                // 9. Additional Details
                 Text(
                   'ADDITIONAL DETAILS',
                   style: AppConstants.subheadingStyle.copyWith(
@@ -607,7 +666,11 @@ class _RequestAidTabState extends State<RequestAidTab> {
     setState(() => _isSubmitting = true);
 
     try {
+      final requesterName = _requesterNameController.text.trim();
+      final mobileNumber = _mobileNumberController.text.trim();
       final details = '''
+Requester Name: ${requesterName.isEmpty ? 'Not provided' : requesterName}
+Mobile Number: ${mobileNumber.isEmpty ? 'Not provided' : mobileNumber}
 Number of People: ${_numberOfPeopleController.text}
 Exact Location: ${_exactLocationController.text}
 Mobility Status: ${_mobilityStatus == 'can_reach' ? 'Can reach distribution point' : 'Need delivery to location'}
@@ -629,7 +692,8 @@ Additional Details: ${_additionalDetailsController.text.isEmpty ? 'None' : _addi
         id: 'AID-${DateTime.now().millisecondsSinceEpoch}',
         priority: priority,
         status: AidStatus.pending,
-        requesterName: 'Citizen',
+        requesterName: requesterName.isEmpty ? 'Citizen' : requesterName,
+        phoneNumber: mobileNumber.isEmpty ? null : mobileNumber,
         resources: [_primaryResource ?? 'Aid'],
         peopleCount: int.parse(_numberOfPeopleController.text.trim()),
         location: _exactLocationController.text.trim(),
@@ -727,6 +791,8 @@ Additional Details: ${_additionalDetailsController.text.isEmpty ? 'None' : _addi
 
   void _resetForm() {
     _formKey.currentState?.reset();
+    _requesterNameController.clear();
+    _mobileNumberController.clear();
     _numberOfPeopleController.clear();
     _exactLocationController.clear();
     _medicalNeedsController.clear();

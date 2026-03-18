@@ -236,6 +236,7 @@ class _AdminLoginState extends State<AdminLogin> {
 
     await adminProvider.refreshAidRequestsForLoggedInArea();
     await adminProvider.refreshSosRequestsForLoggedInArea();
+    await adminProvider.restoreSimulationForCurrentArea();
 
     if (!mounted) return;
 

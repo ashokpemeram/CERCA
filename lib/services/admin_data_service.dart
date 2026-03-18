@@ -158,41 +158,8 @@ class AdminDataService {
 
   /// Get mock incident history
   static List<IncidentHistory> getIncidentHistory() {
-    return [
-      IncidentHistory(
-        id: 'INC-001',
-        severity: IncidentSeverity.critical,
-        status: IncidentStatus.resolved,
-        disasterType: 'Flood',
-        duration: '3 days',
-        responseTime: '45 minutes',
-        affectedCount: 5000,
-        evacuatedCount: 3500,
-        timestamp: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-      IncidentHistory(
-        id: 'INC-002',
-        severity: IncidentSeverity.high,
-        status: IncidentStatus.resolved,
-        disasterType: 'Cyclone',
-        duration: '2 days',
-        responseTime: '30 minutes',
-        affectedCount: 3000,
-        evacuatedCount: 2500,
-        timestamp: DateTime.now().subtract(const Duration(days: 60)),
-      ),
-      IncidentHistory(
-        id: 'INC-003',
-        severity: IncidentSeverity.high,
-        status: IncidentStatus.resolved,
-        disasterType: 'Landslide',
-        duration: '1 day',
-        responseTime: '20 minutes',
-        affectedCount: 1500,
-        evacuatedCount: 1200,
-        timestamp: DateTime.now().subtract(const Duration(days: 90)),
-      ),
-    ];
+    // Archived incident history is now loaded from the backend.
+    return const <IncidentHistory>[];
   }
 
   /// Get mock safe camps

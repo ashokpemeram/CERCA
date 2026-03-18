@@ -46,6 +46,7 @@ class SosTab extends StatelessWidget {
                 itemCount: sosRequests.length,
                 itemBuilder: (context, index) {
                   final sos = sosRequests[index];
+                  final isDispatching = adminProvider.isDispatchingSos(sos.id);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: InfoCard(
@@ -70,8 +71,8 @@ class SosTab extends StatelessWidget {
                               StatusChip.info(sos.areaId),
                               const SizedBox(width: 8),
                               sos.status == SosStatus.pending
-                                  ? StatusChip.warning('Pending')
-                                  : StatusChip.success('Dispatched'),
+                                  ? StatusChip.warning(sos.statusText)
+                                  : StatusChip.success(sos.statusText),
                               if (!sos.insideControllableZone) ...[
                                 const SizedBox(width: 8),
                                 StatusChip.danger('Outside boundary'),
@@ -120,12 +121,44 @@ class SosTab extends StatelessWidget {
                               child: SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  onPressed: sos.insideControllableZone
-                                      ? () => adminProvider
-                                          .dispatchRescueTeam(sos.id)
+                                  onPressed: sos.insideControllableZone &&
+                                          !isDispatching
+                                      ? () async {
+                                          final response =
+                                              await adminProvider
+                                                  .dispatchRescueTeam(sos.id);
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(response.message),
+                                              backgroundColor: response.success
+                                                  ? AppConstants.safeColor
+                                                  : AppConstants.dangerColor,
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
                                       : null,
-                                  icon: const Icon(Icons.local_shipping),
-                                  label: const Text('DISPATCH RESCUE TEAM'),
+                                  icon: isDispatching
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      : const Icon(Icons.local_shipping),
+                                  label: Text(
+                                    isDispatching
+                                        ? 'DISPATCHING...'
+                                        : 'DISPATCH RESCUE TEAM',
+                                  ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppConstants.dangerColor,
                                     foregroundColor: Colors.white,

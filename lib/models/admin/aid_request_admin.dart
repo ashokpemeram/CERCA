@@ -11,12 +11,24 @@ enum AidStatus {
   dispatched,
 }
 
+AidStatus _parseAidStatus(Object? value) {
+  switch (value) {
+    case 'successful':
+    case 'dispatched':
+      return AidStatus.dispatched;
+    case 'pending':
+    default:
+      return AidStatus.pending;
+  }
+}
+
 /// Model for aid requests
 class AidRequestAdmin {
   final String id;
   final AidPriority priority;
   final AidStatus status;
   final String requesterName;
+  final String? phoneNumber;
   final List<String> resources;
   final int peopleCount;
   final String location;
@@ -32,6 +44,7 @@ class AidRequestAdmin {
     required this.priority,
     required this.status,
     required this.requesterName,
+    this.phoneNumber,
     required this.resources,
     required this.peopleCount,
     required this.location,
@@ -51,11 +64,13 @@ class AidRequestAdmin {
         (e) => e.name == json['priority'],
         orElse: () => AidPriority.medium,
       ),
-      status: AidStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => AidStatus.pending,
-      ),
-      requesterName: json['requesterName'] as String,
+      status: _parseAidStatus(json['status']),
+      requesterName: ((json['requesterName'] as String?) ?? '').trim().isEmpty
+          ? 'Citizen'
+          : (json['requesterName'] as String).trim(),
+      phoneNumber: (json['phoneNumber'] as String?)?.trim().isEmpty ?? true
+          ? null
+          : (json['phoneNumber'] as String).trim(),
       resources: List<String>.from(json['resources'] as List),
       peopleCount: json['peopleCount'] as int,
       location: json['location'] as String,
@@ -76,6 +91,7 @@ class AidRequestAdmin {
       'priority': priority.name,
       'status': status.name,
       'requesterName': requesterName,
+      'phoneNumber': phoneNumber,
       'resources': resources,
       'peopleCount': peopleCount,
       'location': location,
@@ -122,6 +138,7 @@ class AidRequestAdmin {
     AidPriority? priority,
     AidStatus? status,
     String? requesterName,
+    String? phoneNumber,
     List<String>? resources,
     int? peopleCount,
     String? location,
@@ -137,6 +154,7 @@ class AidRequestAdmin {
       priority: priority ?? this.priority,
       status: status ?? this.status,
       requesterName: requesterName ?? this.requesterName,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       resources: resources ?? this.resources,
       peopleCount: peopleCount ?? this.peopleCount,
       location: location ?? this.location,

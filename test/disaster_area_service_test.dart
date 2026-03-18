@@ -238,7 +238,7 @@ void main() {
       );
 
       provider.overrideAreasForTesting(active: [areaA]);
-      provider.closeArea(areaA.id);
+      provider.closeAreaLocallyForTesting(areaA.id);
 
       expect(provider.loginToArea('admin@example.com', areaA.id), isFalse);
     });
