@@ -14,6 +14,7 @@ import '../models/admin/disaster_event.dart';
 import '../services/admin_data_service.dart';
 import '../services/api_service.dart';
 import '../services/disaster_area_service.dart';
+import '../models/admin/simulation_sms_status.dart';
 import 'assessment_provider.dart';
 
 /// System status enumeration
@@ -105,10 +106,12 @@ class AdminProvider with ChangeNotifier {
   final Set<String> _simulationAreaIds = {};
   final Random _random = Random();
   int _simulationSequence = 0;
+  SimulationSmsStatus? _lastSimulationSmsStatus;
 
   DisasterEvent? get activeSimulation => _activeSimulation;
   List<DisasterEvent> get simulationHistory => _simulationHistory;
   bool get isSimulationRunning => _activeSimulation?.isActive ?? false;
+  SimulationSmsStatus? get lastSimulationSmsStatus => _lastSimulationSmsStatus;
 
   // AI suggestions for resource allocation
   Map<String, dynamic> _aiSuggestions = {
@@ -1026,6 +1029,7 @@ class AdminProvider with ChangeNotifier {
   }) async {
     _simulationTimer?.cancel();
     _clearSimulationArtifacts();
+    _lastSimulationSmsStatus = null;
 
     final sanitizedTotal = totalCitizens < 1 ? 1 : totalCitizens;
     final sanitizedRadius = radiusM <= 0 ? 500.0 : radiusM;
@@ -1069,7 +1073,11 @@ class AdminProvider with ChangeNotifier {
 
     _activeSimulation = simulation;
     _applyDisasterProfile(type);
-    _applyAssessmentPayload(data['assessment'] as Map<String, dynamic>?);
+    final assessmentPayload = data['assessment'] as Map<String, dynamic>?;
+    _applyAssessmentPayload(assessmentPayload);
+    _lastSimulationSmsStatus = SimulationSmsStatus.fromAssessmentPayload(
+      assessmentPayload,
+    );
     _recordDecision(
       areaId: updatedArea.id,
       actor: 'AI Decision Agent',
@@ -1133,6 +1141,7 @@ class AdminProvider with ChangeNotifier {
     }
 
     final closed = active.copyWith(status: DisasterStatus.inactive);
+    _lastSimulationSmsStatus = null;
     _recordCommunication(
       areaId: active.areaId,
       type: CommunicationLogType.alert,

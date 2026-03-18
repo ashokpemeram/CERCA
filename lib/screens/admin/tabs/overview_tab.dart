@@ -8,6 +8,7 @@ import '../../../widgets/admin/metric_card.dart';
 import '../../../widgets/admin/agent_status_card.dart';
 import '../../../models/admin/sensor_reading.dart';
 import '../../../models/admin/disaster_event.dart';
+import '../../../models/admin/simulation_sms_status.dart';
 
 /// Overview tab for admin dashboard
 class OverviewTab extends StatefulWidget {
@@ -1142,7 +1143,15 @@ class _OverviewTabState extends State<OverviewTab> {
                                     );
                                     return;
                                   }
+                                  final smsStatus =
+                                      adminProvider.lastSimulationSmsStatus;
                                   Navigator.pop(dialogContext);
+                                  if (!context.mounted) return;
+                                  await _showSmsStatusDialog(
+                                    context,
+                                    smsStatus,
+                                  );
+                                  if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(response.message),
@@ -1200,6 +1209,76 @@ class _OverviewTabState extends State<OverviewTab> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _showSmsStatusDialog(
+    BuildContext context,
+    SimulationSmsStatus? smsStatus,
+  ) {
+    final status =
+        smsStatus ??
+        const SimulationSmsStatus(
+          status: 'unavailable',
+          message: 'Simulation started, but the SMS status was unavailable.',
+        );
+
+    final Color accentColor;
+    final IconData icon;
+    switch (status.status) {
+      case 'sent':
+        accentColor = AppConstants.safeColor;
+        icon = Icons.mark_chat_read;
+        break;
+      case 'failed':
+        accentColor = AppConstants.dangerColor;
+        icon = Icons.sms_failed;
+        break;
+      case 'skipped':
+        accentColor = AppConstants.warningColor;
+        icon = Icons.info_outline;
+        break;
+      default:
+        accentColor = AppConstants.primaryColor;
+        icon = Icons.sms_outlined;
+        break;
+    }
+
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(icon, color: accentColor),
+            const SizedBox(width: 10),
+            Expanded(child: Text(status.title)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(status.message),
+            if ((status.recipient ?? '').trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Target number: ${status.recipient}',
+                style: AppConstants.bodyStyle.copyWith(fontSize: 14),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: accentColor,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('OK'),
+          ),
+        ],
       ),
     );
   }
