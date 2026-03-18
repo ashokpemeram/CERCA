@@ -2,18 +2,45 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/aid_request.dart';
 import '../models/admin/aid_request_admin.dart';
+import '../models/admin/incident_history.dart';
 import '../models/admin/sos_request.dart';
 import '../models/admin/disaster_area.dart';
 import '../utils/constants.dart';
 
 /// Service for API communication
 class ApiService {
-  static final ApiService _instance = ApiService._internal();
-  factory ApiService() => _instance;
-  ApiService._internal();
+  ApiService._internal({http.Client? client})
+    : _client = client ?? http.Client();
 
-  final String _baseUrl = AppConstants.baseUrl;
+  static final ApiService _instance = ApiService._internal();
+
+  factory ApiService() => _instance;
+  factory ApiService.withClient(http.Client client) =>
+      ApiService._internal(client: client);
+
   final String _disasterBaseUrl = AppConstants.disasterSystemUrl;
+  final http.Client _client;
+
+  String _errorMessageFromResponse(http.Response response, String fallback) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail'];
+        if (detail is String && detail.trim().isNotEmpty) {
+          return detail.trim();
+        }
+
+        final message = decoded['message'];
+        if (message is String && message.trim().isNotEmpty) {
+          return message.trim();
+        }
+      }
+    } catch (_) {
+      // Fall back to status-based message below.
+    }
+
+    return '$fallback: ${response.statusCode}';
+  }
 
   /// Send SOS alert
   Future<ApiResponse<Map<String, dynamic>>> sendSosAlert({
@@ -41,7 +68,7 @@ class ApiService {
 
       // Actual implementation would be:
       /*
-      final response = await http.post(
+      final response = await _client.post(
         Uri.parse('$_baseUrl${AppConstants.sosEndpoint}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -76,7 +103,7 @@ class ApiService {
   /// Submit SOS request to backend
   Future<ApiResponse<SosRequest>> submitSosRequest(SosRequest request) async {
     try {
-      final response = await http.post(
+      final response = await _client.post(
         Uri.parse('$_disasterBaseUrl${AppConstants.sosRequestsEndpoint}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
@@ -110,20 +137,14 @@ class ApiService {
     try {
       final uri = Uri.parse(
         '$_disasterBaseUrl${AppConstants.sosRequestsEndpoint}',
-      ).replace(
-        queryParameters: {'area_id': areaId},
-      );
+      ).replace(queryParameters: {'area_id': areaId});
 
-      final response = await http.get(uri);
+      final response = await _client.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
         final items = data
-            .map(
-              (item) => SosRequest.fromJson(
-                item as Map<String, dynamic>,
-              ),
-            )
+            .map((item) => SosRequest.fromJson(item as Map<String, dynamic>))
             .toList();
 
         return ApiResponse(
@@ -150,20 +171,14 @@ class ApiService {
     try {
       final uri = Uri.parse(
         '$_disasterBaseUrl${AppConstants.areasEndpoint}',
-      ).replace(
-        queryParameters: {'active': 'true'},
-      );
+      ).replace(queryParameters: {'active': 'true'});
 
-      final response = await http.get(uri);
+      final response = await _client.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
         final items = data
-            .map(
-              (item) => DisasterArea.fromJson(
-                item as Map<String, dynamic>,
-              ),
-            )
+            .map((item) => DisasterArea.fromJson(item as Map<String, dynamic>))
             .toList();
 
         return ApiResponse(
@@ -178,9 +193,301 @@ class ApiService {
         message: 'Failed to fetch areas: ${response.statusCode}',
       );
     } catch (e) {
+      return ApiResponse(success: false, message: 'Error fetching areas: $e');
+    }
+  }
+
+  /// Mark an SOS request as dispatched via the backend admin API.
+  Future<ApiResponse<SosRequest>> dispatchSosRequest(String sosId) async {
+    try {
+      final response = await _client.put(
+        Uri.parse(
+          '$_disasterBaseUrl${AppConstants.adminSosEndpoint}/$sosId/dispatch',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: SosRequest.fromJson(data),
+          message: 'SOS request dispatched successfully',
+        );
+      }
+
       return ApiResponse(
         success: false,
-        message: 'Error fetching areas: $e',
+        message: _errorMessageFromResponse(
+          response,
+          'Failed to dispatch SOS request',
+        ),
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error dispatching SOS request: $e',
+      );
+    }
+  }
+
+  /// Mark an aid request as dispatched via the backend admin API.
+  Future<ApiResponse<AidRequestAdmin>> dispatchAidRequest(String aidId) async {
+    try {
+      final response = await _client.put(
+        Uri.parse(
+          '$_disasterBaseUrl${AppConstants.adminAidEndpoint}/$aidId/dispatch',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: AidRequestAdmin.fromJson(data),
+          message: 'Aid request dispatched successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: _errorMessageFromResponse(
+          response,
+          'Failed to dispatch aid request',
+        ),
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error dispatching aid request: $e',
+      );
+    }
+  }
+
+  /// Close a disaster area via the backend admin API.
+  Future<ApiResponse<DisasterArea>> closeDisasterArea(String areaId) async {
+    try {
+      final response = await _client.put(
+        Uri.parse(
+          '$_disasterBaseUrl${AppConstants.adminDisasterEndpoint}/$areaId/close',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: DisasterArea.fromJson(data),
+          message: 'Area closed successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: _errorMessageFromResponse(response, 'Failed to close area'),
+      );
+    } catch (e) {
+      return ApiResponse(success: false, message: 'Error closing area: $e');
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> archiveAndCloseDisasterArea(
+    String areaId,
+    IncidentHistory incident,
+  ) async {
+    try {
+      final response = await _client.post(
+        Uri.parse(
+          '$_disasterBaseUrl${AppConstants.adminDisasterEndpoint}/$areaId/archive-close',
+        ),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(incident.toJson()),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: data,
+          message:
+              data['message'] as String? ??
+              'Area closed and archived successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: _errorMessageFromResponse(
+          response,
+          'Failed to archive and close area',
+        ),
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error archiving and closing area: $e',
+      );
+    }
+  }
+
+  Future<ApiResponse<List<IncidentHistory>>> fetchIncidentHistory() async {
+    try {
+      final response = await _client.get(
+        Uri.parse('$_disasterBaseUrl${AppConstants.adminHistoryEndpoint}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        final items = data
+            .map(
+              (item) => IncidentHistory.fromJson(item as Map<String, dynamic>),
+            )
+            .toList();
+        return ApiResponse(
+          success: true,
+          data: items,
+          message: 'Archived history fetched successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: _errorMessageFromResponse(
+          response,
+          'Failed to fetch incident history',
+        ),
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error fetching incident history: $e',
+      );
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> startSimulation({
+    String? areaId,
+    double? latitude,
+    double? longitude,
+    required double radiusM,
+    required String disasterType,
+    required String severity,
+    int? durationSeconds,
+    Map<String, dynamic>? thresholdProfile,
+    bool triggerAssessment = true,
+    int? totalCitizens,
+    int? intervalSeconds,
+  }) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$_disasterBaseUrl${AppConstants.simulationStartEndpoint}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'areaId': areaId,
+          'latitude': latitude,
+          'longitude': longitude,
+          'radiusM': radiusM,
+          'disasterType': disasterType,
+          'severity': severity,
+          'durationSeconds': durationSeconds,
+          'thresholdProfile': thresholdProfile,
+          'triggerAssessment': triggerAssessment,
+          'totalCitizens': totalCitizens,
+          'intervalSeconds': intervalSeconds,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: data,
+          message:
+              data['message'] as String? ?? 'Simulation started successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: _errorMessageFromResponse(
+          response,
+          'Failed to start simulation',
+        ),
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error starting simulation: $e',
+      );
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> stopSimulation({
+    String? areaId,
+    String? simulationId,
+  }) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('$_disasterBaseUrl${AppConstants.simulationStopEndpoint}'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'areaId': areaId, 'simulationId': simulationId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: data,
+          message:
+              data['message'] as String? ?? 'Simulation stopped successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: _errorMessageFromResponse(
+          response,
+          'Failed to stop simulation',
+        ),
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error stopping simulation: $e',
+      );
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>?>> fetchActiveSimulation(
+    String areaId,
+  ) async {
+    try {
+      final uri = Uri.parse(
+        '$_disasterBaseUrl${AppConstants.simulationActiveEndpoint}',
+      ).replace(queryParameters: {'area_id': areaId});
+
+      final response = await _client.get(uri);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        return ApiResponse(
+          success: true,
+          data: data,
+          message:
+              data['message'] as String? ??
+              'Simulation state fetched successfully',
+        );
+      }
+
+      return ApiResponse(
+        success: false,
+        message: _errorMessageFromResponse(
+          response,
+          'Failed to fetch active simulation',
+        ),
+      );
+    } catch (e) {
+      return ApiResponse(
+        success: false,
+        message: 'Error fetching active simulation: $e',
       );
     }
   }
@@ -205,7 +512,7 @@ class ApiService {
 
       // Actual implementation would be:
       /*
-      final response = await http.post(
+      final response = await _client.post(
         Uri.parse('$_baseUrl${AppConstants.aidRequestEndpoint}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
@@ -238,7 +545,7 @@ class ApiService {
     AidRequestAdmin request,
   ) async {
     try {
-      final response = await http.post(
+      final response = await _client.post(
         Uri.parse('$_disasterBaseUrl${AppConstants.aidRequestsEndpoint}'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(request.toJson()),
@@ -272,19 +579,15 @@ class ApiService {
     try {
       final uri = Uri.parse(
         '$_disasterBaseUrl${AppConstants.aidRequestsEndpoint}',
-      ).replace(
-        queryParameters: {'area_id': areaId},
-      );
+      ).replace(queryParameters: {'area_id': areaId});
 
-      final response = await http.get(uri);
+      final response = await _client.get(uri);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
         final items = data
             .map(
-              (item) => AidRequestAdmin.fromJson(
-                item as Map<String, dynamic>,
-              ),
+              (item) => AidRequestAdmin.fromJson(item as Map<String, dynamic>),
             )
             .toList();
 
@@ -339,7 +642,7 @@ class ApiService {
       final uri = Uri.parse('$_baseUrl${AppConstants.zonesEndpoint}')
           .replace(queryParameters: queryParams);
 
-      final response = await http.get(uri);
+      final response = await _client.get(uri);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -356,10 +659,7 @@ class ApiService {
       }
       */
     } catch (e) {
-      return ApiResponse(
-        success: false,
-        message: 'Error fetching zones: $e',
-      );
+      return ApiResponse(success: false, message: 'Error fetching zones: $e');
     }
   }
 
@@ -378,7 +678,7 @@ class ApiService {
         'intensity': 'high',
         'description': 'High-intensity danger zone',
       },
-      
+
       // Medium-Risk Orange Zone (overlapping on the right side)
       {
         'id': 'orange_zone_1',
@@ -390,7 +690,7 @@ class ApiService {
         'intensity': 'medium',
         'description': 'Medium-risk zone - exercise caution',
       },
-      
+
       // Safe Camp 1 - Top (above the zones)
       {
         'id': 'safe_camp_top',
@@ -401,7 +701,7 @@ class ApiService {
         'type': 'safeCamp',
         'description': 'Emergency relief camp with supplies',
       },
-      
+
       // Safe Camp 2 - Bottom Left
       {
         'id': 'safe_camp_bottom_left',
@@ -412,7 +712,7 @@ class ApiService {
         'type': 'safeCamp',
         'description': 'Safe shelter with medical facilities',
       },
-      
+
       // Safe Camp 3 - Bottom Right
       {
         'id': 'safe_camp_bottom_right',
@@ -433,11 +733,7 @@ class ApiResponse<T> {
   final T? data;
   final String message;
 
-  ApiResponse({
-    required this.success,
-    this.data,
-    required this.message,
-  });
+  ApiResponse({required this.success, this.data, required this.message});
 }
 
 /// Define sensor reading response structure
@@ -474,56 +770,76 @@ class WeatherSensorResponse {
 
 /// Extend ApiService to add live weather endpoint
 extension WeatherEndpoint on ApiService {
+  Future<ApiResponse<WeatherSensorResponse>> fetchLiveWeatherStatus(
+    String areaId, {
+    double? latitude,
+    double? longitude,
+  }) async {
+    try {
+      String url = '${AppConstants.disasterSystemUrl}/live-weather/$areaId';
+      if (latitude != null && longitude != null) {
+        url += '?lat=$latitude&lon=$longitude';
+      }
+
+      final response = await _client.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        final data = WeatherSensorResponse.fromJson(jsonDecode(response.body));
+        if (data.success && data.readings.isNotEmpty) {
+          return ApiResponse(
+            success: true,
+            data: data,
+            message: 'Live weather status fetched successfully',
+          );
+        }
+      }
+
+      final fallback = WeatherSensorResponse(
+        success: true,
+        areaId: areaId,
+        riskLevel: 'unknown',
+        condition: 'Mock weather fallback',
+        readings: _getMockWeatherReadings(),
+        timestamp: DateTime.now().toIso8601String(),
+      );
+      return ApiResponse(
+        success: true,
+        data: fallback,
+        message: 'Using mock weather data',
+      );
+    } catch (e) {
+      final fallback = WeatherSensorResponse(
+        success: true,
+        areaId: areaId,
+        riskLevel: 'unknown',
+        condition: 'Mock weather fallback',
+        readings: _getMockWeatherReadings(),
+        timestamp: DateTime.now().toIso8601String(),
+      );
+      return ApiResponse(
+        success: true,
+        data: fallback,
+        message: 'Using mock weather data (error: $e)',
+      );
+    }
+  }
+
   /// Fetch live weather sensor readings for a specific area with coordinates
   Future<ApiResponse<List<Map<String, dynamic>>>> fetchLiveWeatherReadings(
     String areaId, {
     double? latitude,
     double? longitude,
   }) async {
-    try {
-      // Build URL with coordinates for more accurate weather
-      String url = '${AppConstants.disasterSystemUrl}/live-weather/$areaId';
-      
-      if (latitude != null && longitude != null) {
-        url += '?lat=$latitude&lon=$longitude';
-      }
-
-      print('ApiService: Fetching weather from $url');
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final data = WeatherSensorResponse.fromJson(jsonDecode(response.body));
-        
-        if (data.success && data.readings.isNotEmpty) {
-          return ApiResponse(
-            success: true,
-            data: data.readings,
-            message: 'Live weather readings fetched successfully',
-          );
-        } else {
-          // Fallback to mock data if no readings found
-          return ApiResponse(
-            success: true,
-            data: _getMockWeatherReadings(),
-            message: 'Using mock weather data (no live data available)',
-          );
-        }
-      } else {
-        // Fallback to mock data on error
-        return ApiResponse(
-          success: true,
-          data: _getMockWeatherReadings(),
-          message: 'Using mock weather data (backend unavailable)',
-        );
-      }
-    } catch (e) {
-      // Fallback to mock data on error
-      return ApiResponse(
-        success: true,
-        data: _getMockWeatherReadings(),
-        message: 'Using mock weather data (error: $e)',
-      );
-    }
+    final response = await fetchLiveWeatherStatus(
+      areaId,
+      latitude: latitude,
+      longitude: longitude,
+    );
+    return ApiResponse(
+      success: response.success,
+      data: response.data?.readings ?? _getMockWeatherReadings(),
+      message: response.message,
+    );
   }
 
   /// Get mock weather readings as fallback

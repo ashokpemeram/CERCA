@@ -7,6 +7,7 @@ class DisasterArea {
   final double greenRadiusM;
   final double controllableRadiusM;
   final DateTime createdAt;
+  final bool isActive;
   DateTime? closedAt;
 
   DisasterArea({
@@ -18,6 +19,7 @@ class DisasterArea {
     required this.greenRadiusM,
     required this.controllableRadiusM,
     required this.createdAt,
+    this.isActive = true,
     this.closedAt,
   });
 
@@ -31,6 +33,7 @@ class DisasterArea {
       greenRadiusM: (json['greenRadiusM'] as num).toDouble(),
       controllableRadiusM: (json['controllableRadiusM'] as num).toDouble(),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      isActive: (json['isActive'] as bool?) ?? (json['closedAt'] == null),
       closedAt: json['closedAt'] != null
           ? DateTime.parse(json['closedAt'] as String)
           : null,
@@ -47,11 +50,10 @@ class DisasterArea {
       'greenRadiusM': greenRadiusM,
       'controllableRadiusM': controllableRadiusM,
       'createdAt': createdAt.toIso8601String(),
+      'isActive': isActive,
       'closedAt': closedAt?.toIso8601String(),
     };
   }
-
-  bool get isActive => closedAt == null;
 
   DisasterArea copyWith({
     String? id,
@@ -62,6 +64,7 @@ class DisasterArea {
     double? greenRadiusM,
     double? controllableRadiusM,
     DateTime? createdAt,
+    bool? isActive,
     DateTime? closedAt,
   }) {
     return DisasterArea(
@@ -73,6 +76,7 @@ class DisasterArea {
       greenRadiusM: greenRadiusM ?? this.greenRadiusM,
       controllableRadiusM: controllableRadiusM ?? this.controllableRadiusM,
       createdAt: createdAt ?? this.createdAt,
+      isActive: isActive ?? this.isActive,
       closedAt: closedAt ?? this.closedAt,
     );
   }

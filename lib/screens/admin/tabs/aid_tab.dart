@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../providers/admin_provider.dart';
 import '../../../utils/constants.dart';
+import '../../../utils/helpers.dart';
 import '../../../widgets/admin/info_card.dart';
 import '../../../widgets/admin/status_chip.dart';
 import '../../../models/admin/aid_request_admin.dart';
@@ -46,6 +47,7 @@ class AidTab extends StatelessWidget {
                 itemCount: aidRequests.length,
                 itemBuilder: (context, index) {
                   final aid = aidRequests[index];
+                  final isDispatching = adminProvider.isDispatchingAid(aid.id);
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: InfoCard(
@@ -68,8 +70,8 @@ class AidTab extends StatelessWidget {
                               _getPriorityChip(aid.priority),
                               const SizedBox(width: 8),
                               aid.status == AidStatus.pending
-                                  ? StatusChip.warning('Pending')
-                                  : StatusChip.success('Dispatched'),
+                                  ? StatusChip.warning(aid.statusText)
+                                  : StatusChip.success(aid.statusText),
                               if (!aid.insideControllableZone) ...[
                                 const SizedBox(width: 8),
                                 StatusChip.danger('Outside boundary'),
@@ -89,6 +91,14 @@ class AidTab extends StatelessWidget {
                             'Requester',
                             aid.requesterName,
                           ),
+                          if ((aid.phoneNumber ?? '').trim().isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _buildDetailRow(
+                              Icons.phone,
+                              'Mobile',
+                              Helpers.formatPhoneNumber(aid.phoneNumber!.trim()),
+                            ),
+                          ],
                           const SizedBox(height: 8),
                           _buildDetailRow(
                             Icons.inventory,
@@ -132,12 +142,45 @@ class AidTab extends StatelessWidget {
                               child: SizedBox(
                                 width: double.infinity,
                                 child: ElevatedButton.icon(
-                                  onPressed: aid.insideControllableZone
-                                      ? () =>
-                                          adminProvider.dispatchAid(aid.id)
+                                  onPressed: aid.insideControllableZone &&
+                                          !isDispatching
+                                      ? () async {
+                                          final response =
+                                              await adminProvider.dispatchAid(
+                                            aid.id,
+                                          );
+                                          if (!context.mounted) return;
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(response.message),
+                                              backgroundColor: response.success
+                                                  ? AppConstants.safeColor
+                                                  : AppConstants.dangerColor,
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                            ),
+                                          );
+                                        }
                                       : null,
-                                  icon: const Icon(Icons.send),
-                                  label: const Text('DISPATCH AID'),
+                                  icon: isDispatching
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
+                                          ),
+                                        )
+                                      : const Icon(Icons.send),
+                                  label: Text(
+                                    isDispatching
+                                        ? 'DISPATCHING...'
+                                        : 'DISPATCH AID',
+                                  ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor:
                                         AppConstants.primaryColor,

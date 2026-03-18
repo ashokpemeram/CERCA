@@ -1,10 +1,5 @@
 /// Communication log type enumeration
-enum CommunicationLogType {
-  sms,
-  alert,
-  evacuation,
-  resource,
-}
+enum CommunicationLogType { sms, alert, evacuation, resource }
 
 /// Model for communication logs
 class CommunicationLog {
@@ -12,12 +7,14 @@ class CommunicationLog {
   final CommunicationLogType type;
   final String message;
   final DateTime timestamp;
+  final String? areaId;
 
   CommunicationLog({
     required this.id,
     required this.type,
     required this.message,
     required this.timestamp,
+    this.areaId,
   });
 
   /// Create from JSON
@@ -30,6 +27,7 @@ class CommunicationLog {
       ),
       message: json['message'] as String,
       timestamp: DateTime.parse(json['timestamp'] as String),
+      areaId: json['areaId'] as String?,
     );
   }
 
@@ -40,6 +38,7 @@ class CommunicationLog {
       'type': type.name,
       'message': message,
       'timestamp': timestamp.toIso8601String(),
+      'areaId': areaId,
     };
   }
 

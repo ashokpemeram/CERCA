@@ -4,6 +4,17 @@ enum SosStatus {
   dispatched,
 }
 
+SosStatus _parseSosStatus(Object? value) {
+  switch (value) {
+    case 'successful':
+    case 'dispatched':
+      return SosStatus.dispatched;
+    case 'pending':
+    default:
+      return SosStatus.pending;
+  }
+}
+
 /// Model for SOS emergency requests
 class SosRequest {
   final String id;
@@ -40,10 +51,7 @@ class SosRequest {
   factory SosRequest.fromJson(Map<String, dynamic> json) {
     return SosRequest(
       id: json['id'] as String,
-      status: SosStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => SosStatus.pending,
-      ),
+      status: _parseSosStatus(json['status']),
       callerName: json['callerName'] as String,
       phoneNumber: json['phoneNumber'] as String,
       address: json['address'] as String,

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/admin_provider.dart';
 import '../../../providers/location_provider.dart';
@@ -48,6 +48,9 @@ class _OverviewTabState extends State<OverviewTab> {
     return Consumer<AdminProvider>(
       builder: (context, adminProvider, child) {
         final simulation = adminProvider.activeSimulation;
+        final currentArea = adminProvider.currentArea;
+        final isClosingCurrentArea =
+            currentArea != null && adminProvider.isClosingArea(currentArea.id);
         return SingleChildScrollView(
           padding: const EdgeInsets.all(AppConstants.paddingMedium),
           child: Column(
@@ -59,7 +62,7 @@ class _OverviewTabState extends State<OverviewTab> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: adminProvider.systemStatus == SystemStatus.normal
-                              ? [Colors.green[700]!, Colors.green[900]!]
+                        ? [Colors.green[700]!, Colors.green[900]!]
                         : [Colors.red[700]!, Colors.red[900]!],
                   ),
                   borderRadius: BorderRadius.circular(12),
@@ -83,14 +86,14 @@ class _OverviewTabState extends State<OverviewTab> {
                             color:
                                 adminProvider.systemStatus ==
                                     SystemStatus.normal
-                              ? Colors.green[300]
+                                ? Colors.green[300]
                                 : Colors.red[300],
                             boxShadow: [
                               BoxShadow(
                                 color:
                                     (adminProvider.systemStatus ==
                                                 SystemStatus.normal
-                              ? Colors.green[300]
+                                            ? Colors.green[300]
                                             : Colors.red[300])!
                                         .withOpacity(0.8),
                                 blurRadius: 8,
@@ -204,25 +207,42 @@ class _OverviewTabState extends State<OverviewTab> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    if (adminProvider.currentArea == null)
+                    if (currentArea == null)
                       Text(
                         'No active area selected.',
                         style: AppConstants.bodyStyle.copyWith(fontSize: 12),
                       )
                     else ...[
                       Text(
-                        'Active Area ID: ${adminProvider.currentArea!.id}',
+                        'Active Area ID: ${currentArea.id}',
                         style: AppConstants.bodyStyle.copyWith(fontSize: 12),
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
-                        onPressed: () => _confirmCloseArea(
-                          context,
-                          adminProvider,
-                          adminProvider.currentArea!.id,
+                        onPressed: isClosingCurrentArea
+                            ? null
+                            : () => _confirmCloseArea(
+                                context,
+                                adminProvider,
+                                currentArea.id,
+                              ),
+                        icon: isClosingCurrentArea
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
+                                ),
+                              )
+                            : const Icon(Icons.lock),
+                        label: Text(
+                          isClosingCurrentArea
+                              ? 'Closing...'
+                              : 'Close Active Area',
                         ),
-                        icon: const Icon(Icons.lock),
-                        label: const Text('Close Active Area'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConstants.dangerColor,
                           foregroundColor: Colors.white,
@@ -722,8 +742,9 @@ class _OverviewTabState extends State<OverviewTab> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Close Active Area'),
         content: const Text(
-          'Closing this area will archive it and prevent new admin logins. '
-          'Existing logs remain visible for history.',
+          'Closing this area will archive the full disaster session into History, '
+          'including logs, camps, weather snapshots, and decision records. '
+          'New admin logins will be blocked after closure.',
         ),
         actions: [
           TextButton(
@@ -731,13 +752,16 @@ class _OverviewTabState extends State<OverviewTab> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(dialogContext);
-              adminProvider.closeArea(areaId);
+              final response = await adminProvider.closeArea(areaId);
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('Area closed and archived.'),
-                  backgroundColor: AppConstants.dangerColor,
+                  content: Text(response.message),
+                  backgroundColor: response.success
+                      ? AppConstants.dangerColor
+                      : AppConstants.warningColor,
                   behavior: SnackBarBehavior.floating,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -841,6 +865,7 @@ class _OverviewTabState extends State<OverviewTab> {
 
     String disasterType = adminProvider.currentDisasterType ?? 'Flood';
     DisasterSeverity severity = DisasterSeverity.medium;
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
@@ -868,7 +893,7 @@ class _OverviewTabState extends State<OverviewTab> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Configure a realistic incident and stream SOS alerts over time.',
+                    'Use backend simulation mode to force live weather into a demo disaster state.',
                     style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
@@ -910,10 +935,7 @@ class _OverviewTabState extends State<OverviewTab> {
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(
-                        value: 'Flood',
-                        child: Text('Flood'),
-                      ),
+                      DropdownMenuItem(value: 'Flood', child: Text('Flood')),
                       DropdownMenuItem(
                         value: 'Earthquake',
                         child: Text('Earthquake'),
@@ -922,10 +944,7 @@ class _OverviewTabState extends State<OverviewTab> {
                         value: 'Cyclone',
                         child: Text('Cyclone'),
                       ),
-                      DropdownMenuItem(
-                        value: 'Fire',
-                        child: Text('Fire'),
-                      ),
+                      DropdownMenuItem(value: 'Fire', child: Text('Fire')),
                     ],
                     onChanged: (value) {
                       if (value == null) return;
@@ -940,10 +959,6 @@ class _OverviewTabState extends State<OverviewTab> {
                       border: OutlineInputBorder(),
                     ),
                     items: const [
-                      DropdownMenuItem(
-                        value: DisasterSeverity.low,
-                        child: Text('Low'),
-                      ),
                       DropdownMenuItem(
                         value: DisasterSeverity.medium,
                         child: Text('Medium'),
@@ -996,10 +1011,10 @@ class _OverviewTabState extends State<OverviewTab> {
                       onPressed: position == null
                           ? null
                           : () {
-                              latController.text =
-                                  position.latitude.toStringAsFixed(6);
-                              lngController.text =
-                                  position.longitude.toStringAsFixed(6);
+                              latController.text = position.latitude
+                                  .toStringAsFixed(6);
+                              lngController.text = position.longitude
+                                  .toStringAsFixed(6);
                               setState(() {});
                             },
                       icon: const Icon(Icons.my_location, size: 16),
@@ -1044,74 +1059,109 @@ class _OverviewTabState extends State<OverviewTab> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
-                            final lat = double.tryParse(
-                              latController.text.trim(),
-                            );
-                            final lon = double.tryParse(
-                              lngController.text.trim(),
-                            );
-                            final radius =
-                                double.tryParse(radiusController.text.trim()) ??
-                                0;
-                            final citizens =
-                                int.tryParse(citizensController.text.trim()) ??
-                                0;
-                            final intervalSeconds =
-                                int.tryParse(intervalController.text.trim()) ??
-                                0;
+                          onPressed: isSubmitting
+                              ? null
+                              : () async {
+                                  final lat = double.tryParse(
+                                    latController.text.trim(),
+                                  );
+                                  final lon = double.tryParse(
+                                    lngController.text.trim(),
+                                  );
+                                  final radius =
+                                      double.tryParse(
+                                        radiusController.text.trim(),
+                                      ) ??
+                                      0;
+                                  final citizens =
+                                      int.tryParse(
+                                        citizensController.text.trim(),
+                                      ) ??
+                                      0;
+                                  final intervalSeconds =
+                                      int.tryParse(
+                                        intervalController.text.trim(),
+                                      ) ??
+                                      0;
 
-                            if (lat == null || lon == null) {
-                              ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Enter valid coordinates.'),
-                                  backgroundColor: AppConstants.dangerColor,
-                                ),
-                              );
-                              return;
-                            }
-                            if (radius <= 0 || citizens <= 0) {
-                              ScaffoldMessenger.of(dialogContext).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Enter valid radius and count.'),
-                                  backgroundColor: AppConstants.dangerColor,
-                                ),
-                              );
-                              return;
-                            }
+                                  if (lat == null || lon == null) {
+                                    ScaffoldMessenger.of(
+                                      dialogContext,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Enter valid coordinates.',
+                                        ),
+                                        backgroundColor:
+                                            AppConstants.dangerColor,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  if (radius <= 0 || citizens <= 0) {
+                                    ScaffoldMessenger.of(
+                                      dialogContext,
+                                    ).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Enter valid radius and count.',
+                                        ),
+                                        backgroundColor:
+                                            AppConstants.dangerColor,
+                                      ),
+                                    );
+                                    return;
+                                  }
 
-                            final interval = intervalSeconds <= 0
-                                ? const Duration(seconds: 2)
-                                : Duration(seconds: intervalSeconds);
+                                  final interval = intervalSeconds <= 0
+                                      ? const Duration(seconds: 2)
+                                      : Duration(seconds: intervalSeconds);
 
-                            adminProvider.startDisasterSimulation(
-                              type: disasterType,
-                              centerLat: lat,
-                              centerLon: lon,
-                              radiusM: radius,
-                              severity: severity,
-                              totalCitizens: citizens,
-                              interval: interval,
-                            );
-                            Navigator.pop(dialogContext);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '$disasterType simulation started.',
-                                ),
-                                backgroundColor: AppConstants.primaryColor,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                            );
-                          },
+                                  setState(() => isSubmitting = true);
+                                  final response = await adminProvider
+                                      .startDisasterSimulation(
+                                        type: disasterType,
+                                        centerLat: lat,
+                                        centerLon: lon,
+                                        radiusM: radius,
+                                        severity: severity,
+                                        totalCitizens: citizens,
+                                        interval: interval,
+                                      );
+                                  if (!context.mounted) return;
+                                  setState(() => isSubmitting = false);
+                                  if (!response.success) {
+                                    ScaffoldMessenger.of(
+                                      dialogContext,
+                                    ).showSnackBar(
+                                      SnackBar(
+                                        content: Text(response.message),
+                                        backgroundColor:
+                                            AppConstants.dangerColor,
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  Navigator.pop(dialogContext);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(response.message),
+                                      backgroundColor:
+                                          AppConstants.primaryColor,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  );
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppConstants.primaryColor,
                             foregroundColor: Colors.white,
                           ),
-                          child: const Text('Start Simulation'),
+                          child: Text(
+                            isSubmitting ? 'Starting...' : 'Start Simulation',
+                          ),
                         ),
                       ),
                     ],
@@ -1119,10 +1169,24 @@ class _OverviewTabState extends State<OverviewTab> {
                   if (adminProvider.activeSimulation != null) ...[
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
-                      onPressed: () {
-                        adminProvider.stopSimulation();
-                        Navigator.pop(dialogContext);
-                      },
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              setState(() => isSubmitting = true);
+                              final response = await adminProvider
+                                  .stopSimulation();
+                              if (!context.mounted) return;
+                              setState(() => isSubmitting = false);
+                              Navigator.pop(dialogContext);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(response.message),
+                                  backgroundColor: response.success
+                                      ? AppConstants.dangerColor
+                                      : AppConstants.warningColor,
+                                ),
+                              );
+                            },
                       icon: const Icon(Icons.stop),
                       label: const Text('Stop Simulation'),
                       style: OutlinedButton.styleFrom(
@@ -1249,6 +1313,3 @@ class _OverviewTabState extends State<OverviewTab> {
     }
   }
 }
-
-
-

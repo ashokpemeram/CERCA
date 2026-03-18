@@ -23,7 +23,16 @@ class CercaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         ChangeNotifierProvider(create: (_) => ZoneProvider()),
         ChangeNotifierProvider(create: (_) => AssessmentProvider()),
-        ChangeNotifierProvider(create: (_) => AdminProvider()),
+        ChangeNotifierProxyProvider<AssessmentProvider, AdminProvider>(
+          create: (context) => AdminProvider(
+            assessmentProvider: Provider.of<AssessmentProvider>(
+              context,
+              listen: false,
+            ),
+          ),
+          update: (context, assessment, admin) =>
+              admin!..setAssessmentProvider(assessment),
+        ),
       ],
       child: MaterialApp(
         title: AppConstants.appName,
