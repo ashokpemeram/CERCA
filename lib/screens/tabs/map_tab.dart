@@ -34,9 +34,10 @@ class _MapTabState extends State<MapTab> {
     _assessmentTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       final loc = context.read<LocationProvider>();
       if (loc.latitude != null && loc.longitude != null) {
-        context
-            .read<AssessmentProvider>()
-            .assessByCoordinates(loc.latitude!, loc.longitude!);
+        context.read<AssessmentProvider>().assessByCoordinates(
+          loc.latitude!,
+          loc.longitude!,
+        );
       }
     });
   }
@@ -50,9 +51,10 @@ class _MapTabState extends State<MapTab> {
       if (loc.latitude != null && loc.longitude != null) {
         _hasAutoAssessed = true;
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          context
-              .read<AssessmentProvider>()
-              .assessByCoordinates(loc.latitude!, loc.longitude!);
+          context.read<AssessmentProvider>().assessByCoordinates(
+            loc.latitude!,
+            loc.longitude!,
+          );
         });
       }
     }
@@ -112,150 +114,171 @@ class _MapTabState extends State<MapTab> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<LocationProvider, ZoneProvider, AssessmentProvider, AdminProvider>(
-      builder: (context, locationProvider, zoneProvider, assessmentProvider, adminProvider, child) {
-        if (locationProvider.isLoading) {
-          return const LoadingIndicator(message: 'Getting your location...');
-        }
+    return Consumer4<
+      LocationProvider,
+      ZoneProvider,
+      AssessmentProvider,
+      AdminProvider
+    >(
+      builder:
+          (
+            context,
+            locationProvider,
+            zoneProvider,
+            assessmentProvider,
+            adminProvider,
+            child,
+          ) {
+            if (locationProvider.isLoading) {
+              return const LoadingIndicator(
+                message: 'Getting your location...',
+              );
+            }
 
-        _maybePromptForLocation(locationProvider);
+            _maybePromptForLocation(locationProvider);
 
-        if (locationProvider.errorMessage != null) {
-          return _buildErrorView(locationProvider);
-        }
+            if (locationProvider.errorMessage != null) {
+              return _buildErrorView(locationProvider);
+            }
 
-        if (locationProvider.currentPosition == null) {
-          return const Center(child: Text('Unable to get location'));
-        }
+            if (locationProvider.currentPosition == null) {
+              return const Center(child: Text('Unable to get location'));
+            }
 
-        final position = locationProvider.currentPosition!;
-        final currentLatLng = LatLng(position.latitude, position.longitude);
-        final result = assessmentProvider.result;
-        final route = adminProvider.routeToArea(
-          position.latitude,
-          position.longitude,
-        );
-        final activeAreaId = adminProvider.loggedInAreaId ?? route.areaId;
-        final adminCamps = activeAreaId == 'UNASSIGNED'
-            ? <SafeCamp>[]
-            : adminProvider.safeCamps
-                .where((camp) => camp.areaId == activeAreaId)
-                .toList();
+            final position = locationProvider.currentPosition!;
+            final currentLatLng = LatLng(position.latitude, position.longitude);
+            final result = assessmentProvider.result;
+            final route = adminProvider.routeToArea(
+              position.latitude,
+              position.longitude,
+            );
+            final activeAreaId = adminProvider.loggedInAreaId ?? route.areaId;
+            final adminCamps = activeAreaId == 'UNASSIGNED'
+                ? <SafeCamp>[]
+                : adminProvider.safeCamps
+                      .where((camp) => camp.areaId == activeAreaId)
+                      .toList();
 
-        return Stack(
-          children: [
-            FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(
-                initialCenter: currentLatLng,
-                initialZoom: AppConstants.defaultZoom,
-                minZoom: 5.0,
-                maxZoom: 18.0,
-              ),
+            return Stack(
               children: [
-                // OpenStreetMap tiles
-                TileLayer(
-                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                  userAgentPackageName: 'com.cerca.app',
-                ),
-
-                // Static zone circles — only shown when no AI result yet
-                CircleLayer(
-                  circles: _buildCircleLayers(zoneProvider.zones, result),
-                ),
-
-                // Live AI risk circle — drawn around the user's location
-                if (result != null)
-                  CircleLayer(
-                    circles: [_buildAiRiskCircle(currentLatLng, result)],
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: currentLatLng,
+                    initialZoom: AppConstants.defaultZoom,
+                    minZoom: 5.0,
+                    maxZoom: 18.0,
                   ),
+                  children: [
+                    // OpenStreetMap tiles
+                    TileLayer(
+                      urlTemplate:
+                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.cerca.app',
+                    ),
 
-                // Markers (user + safe camp icons always; danger icons only without AI)
-                MarkerLayer(
-                  markers: _buildMarkers(
-                    currentLatLng,
-                    zoneProvider.zones,
-                    result,
-                    assessmentProvider.isLoading,
-                    adminCamps,
-                  ),
+                    // Static zone circles — only shown when no AI result yet
+                    CircleLayer(
+                      circles: _buildCircleLayers(zoneProvider.zones, result),
+                    ),
+
+                    // Live AI risk circle — drawn around the user's location
+                    if (result != null)
+                      CircleLayer(
+                        circles: [_buildAiRiskCircle(currentLatLng, result)],
+                      ),
+
+                    // Markers (user + safe camp icons always; danger icons only without AI)
+                    MarkerLayer(
+                      markers: _buildMarkers(
+                        currentLatLng,
+                        zoneProvider.zones,
+                        result,
+                        assessmentProvider.isLoading,
+                        adminCamps,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
 
-            // Legend
-            Positioned(
-              top: 16,
-              right: 16,
-              child: _buildLegend(result != null),
-            ),
+                // Legend
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: _buildLegend(result != null),
+                ),
 
-            // Recenter button
-            Positioned(
-              bottom: 16,
-              right: 16,
-              child: _buildRecenterButton(currentLatLng),
-            ),
+                // Recenter button
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: _buildRecenterButton(currentLatLng),
+                ),
 
-            // AI Risk banner (replaces static zone banner)
-            Positioned(
-              top: 16,
-              left: 16,
-              right: 100,
-              child: _buildRiskBanner(
-                position.latitude,
-                position.longitude,
-                zoneProvider,
-                assessmentProvider,
-              ),
-            ),
-
-            if (assessmentProvider.errorMessage != null)
-              Positioned(
-                top: 72,
-                left: 16,
-                right: 16,
-                child: _buildAssessmentErrorBanner(
-                  assessmentProvider.errorMessage!,
-                  () => assessmentProvider.assessByCoordinates(
+                // AI Risk banner (replaces static zone banner)
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  right: 100,
+                  child: _buildRiskBanner(
                     position.latitude,
                     position.longitude,
+                    zoneProvider,
+                    assessmentProvider,
                   ),
                 ),
-              ),
 
-            // Loading indicator overlay (small, non-blocking)
-            if (assessmentProvider.isLoading)
-              Positioned(
-                bottom: 80,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
+                if (assessmentProvider.errorMessage != null)
+                  Positioned(
+                    top: 72,
+                    left: 16,
+                    right: 16,
+                    child: _buildAssessmentErrorBanner(
+                      assessmentProvider.errorMessage!,
+                      () => assessmentProvider.assessByCoordinates(
+                        position.latitude,
+                        position.longitude,
                       ),
-                      SizedBox(width: 8),
-                      Text('Updating risk...',
-                          style: TextStyle(color: Colors.white, fontSize: 12)),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-          ],
-        );
-      },
+
+                // Loading indicator overlay (small, non-blocking)
+                if (assessmentProvider.isLoading)
+                  Positioned(
+                    bottom: 80,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            'Updating risk...',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
     );
   }
 
@@ -306,6 +329,7 @@ class _MapTabState extends State<MapTab> {
       Color bannerColor;
       IconData bannerIcon;
       String message;
+      String? detailMessage;
 
       switch (result.overallRisk.toLowerCase()) {
         case 'high':
@@ -331,14 +355,24 @@ class _MapTabState extends State<MapTab> {
           break;
       }
 
-      return _bannerCard(bannerColor, bannerIcon, message);
+      detailMessage = _buildRiskBannerDetail(result);
+      message = _sanitizeRiskBannerMessage(message);
+
+      return _bannerCardWithDetail(
+        bannerColor,
+        bannerIcon,
+        message,
+        detailMessage: detailMessage,
+      );
     }
 
     // Fallback to static zone status while AI is loading/unavailable
     if (zoneProvider.zones.isEmpty) return const SizedBox.shrink();
 
-    final zoneStatus =
-        zoneProvider.getZoneStatus(latitude: latitude, longitude: longitude);
+    final zoneStatus = zoneProvider.getZoneStatus(
+      latitude: latitude,
+      longitude: longitude,
+    );
 
     Color bannerColor = AppConstants.primaryColor;
     IconData bannerIcon = Icons.info;
@@ -391,6 +425,88 @@ class _MapTabState extends State<MapTab> {
     );
   }
 
+  Widget _bannerCardWithDetail(
+    Color color,
+    IconData icon,
+    String message, {
+    String? detailMessage,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 350),
+      child: Card(
+        color: color,
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (detailMessage != null && detailMessage.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        detailMessage,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _sanitizeRiskBannerMessage(String message) {
+    return message
+        .replaceAll('âš ï¸ ', '')
+        .replaceAll('âœ“ ', '')
+        .replaceAll('Â°C', '°C')
+        .replaceAll('â€¢', '-')
+        .trim();
+  }
+
+  String? _buildRiskBannerDetail(AssessmentResult result) {
+    final risk = result.overallRisk.toLowerCase();
+    if (risk == 'medium' || risk == 'high') {
+      return result.riskAspectSummary;
+    }
+
+    if (result.weatherCondition != null) {
+      final temperature = result.temperatureC?.toStringAsFixed(0);
+      if (temperature == null) {
+        return result.weatherCondition;
+      }
+      return '${result.weatherCondition}  $temperature°C';
+    }
+
+    return null;
+  }
+
   Widget _buildErrorView(LocationProvider locationProvider) {
     return Center(
       child: Padding(
@@ -398,8 +514,11 @@ class _MapTabState extends State<MapTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.location_off,
-                size: 64, color: AppConstants.dangerColor),
+            const Icon(
+              Icons.location_off,
+              size: 64,
+              color: AppConstants.dangerColor,
+            ),
             const SizedBox(height: AppConstants.paddingMedium),
             Text(
               locationProvider.errorMessage ?? 'Location error',
@@ -431,8 +550,10 @@ class _MapTabState extends State<MapTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Legend',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            const Text(
+              'Legend',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
             const SizedBox(height: 8),
             _buildLegendItem(Colors.blue, 'Your Location'),
             if (hasAiCircle) ...[
@@ -474,16 +595,14 @@ class _MapTabState extends State<MapTab> {
 
   Widget _buildRecenterButton(LatLng currentLatLng) {
     return FloatingActionButton(
-      onPressed: () => _mapController.move(currentLatLng, AppConstants.defaultZoom),
+      onPressed: () =>
+          _mapController.move(currentLatLng, AppConstants.defaultZoom),
       backgroundColor: AppConstants.primaryColor,
       child: const Icon(Icons.my_location, color: Colors.white),
     );
   }
 
-  Widget _buildAssessmentErrorBanner(
-    String message,
-    VoidCallback onRetry,
-  ) {
+  Widget _buildAssessmentErrorBanner(String message, VoidCallback onRetry) {
     return Card(
       color: AppConstants.dangerColor,
       elevation: 4,
@@ -511,7 +630,10 @@ class _MapTabState extends State<MapTab> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Colors.white),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
               ),
               child: const Text(
                 'Retry',
@@ -525,7 +647,9 @@ class _MapTabState extends State<MapTab> {
   }
 
   List<CircleMarker> _buildCircleLayers(
-      List<app_zone.Zone> zones, AssessmentResult? result) {
+    List<app_zone.Zone> zones,
+    AssessmentResult? result,
+  ) {
     // Suppress mock circles when:
     // - AI result is available (real circle is shown instead), OR
     // - AI is still loading (avoid flashing wrong data)
@@ -534,56 +658,67 @@ class _MapTabState extends State<MapTab> {
     List<CircleMarker> circles = [];
 
     final orangeZones = zones
-        .where((z) =>
-            z.type == app_zone.ZoneType.danger &&
-            z.intensity == app_zone.ZoneIntensity.medium)
+        .where(
+          (z) =>
+              z.type == app_zone.ZoneType.danger &&
+              z.intensity == app_zone.ZoneIntensity.medium,
+        )
         .toList();
 
     final redZones = zones
-        .where((z) =>
-            z.type == app_zone.ZoneType.danger &&
-            z.intensity == app_zone.ZoneIntensity.high)
+        .where(
+          (z) =>
+              z.type == app_zone.ZoneType.danger &&
+              z.intensity == app_zone.ZoneIntensity.high,
+        )
         .toList();
 
-    final safeZones =
-        zones.where((z) => z.type == app_zone.ZoneType.safe).toList();
+    final safeZones = zones
+        .where((z) => z.type == app_zone.ZoneType.safe)
+        .toList();
 
     for (final zone in orangeZones) {
       if (zone.radiusInMeters > 0) {
-        circles.add(CircleMarker(
-          point: LatLng(zone.latitude, zone.longitude),
-          radius: zone.radiusInMeters,
-          useRadiusInMeter: true,
-          color: AppConstants.mediumRiskColor.withOpacity(0.4),
-          borderColor: AppConstants.mediumRiskColor,
-          borderStrokeWidth: 2,
-        ));
+        circles.add(
+          CircleMarker(
+            point: LatLng(zone.latitude, zone.longitude),
+            radius: zone.radiusInMeters,
+            useRadiusInMeter: true,
+            color: AppConstants.mediumRiskColor.withOpacity(0.4),
+            borderColor: AppConstants.mediumRiskColor,
+            borderStrokeWidth: 2,
+          ),
+        );
       }
     }
 
     for (final zone in redZones) {
       if (zone.radiusInMeters > 0) {
-        circles.add(CircleMarker(
-          point: LatLng(zone.latitude, zone.longitude),
-          radius: zone.radiusInMeters,
-          useRadiusInMeter: true,
-          color: AppConstants.dangerColor.withOpacity(0.45),
-          borderColor: AppConstants.dangerColor,
-          borderStrokeWidth: 3,
-        ));
+        circles.add(
+          CircleMarker(
+            point: LatLng(zone.latitude, zone.longitude),
+            radius: zone.radiusInMeters,
+            useRadiusInMeter: true,
+            color: AppConstants.dangerColor.withOpacity(0.45),
+            borderColor: AppConstants.dangerColor,
+            borderStrokeWidth: 3,
+          ),
+        );
       }
     }
 
     for (final zone in safeZones) {
       if (zone.radiusInMeters > 0) {
-        circles.add(CircleMarker(
-          point: LatLng(zone.latitude, zone.longitude),
-          radius: zone.radiusInMeters,
-          useRadiusInMeter: true,
-          color: AppConstants.safeColor.withOpacity(0.2),
-          borderColor: AppConstants.safeColor,
-          borderStrokeWidth: 2,
-        ));
+        circles.add(
+          CircleMarker(
+            point: LatLng(zone.latitude, zone.longitude),
+            radius: zone.radiusInMeters,
+            useRadiusInMeter: true,
+            color: AppConstants.safeColor.withOpacity(0.2),
+            borderColor: AppConstants.safeColor,
+            borderStrokeWidth: 2,
+          ),
+        );
       }
     }
 
@@ -591,19 +726,22 @@ class _MapTabState extends State<MapTab> {
   }
 
   List<Marker> _buildMarkers(
-      LatLng currentLatLng,
-      List<app_zone.Zone> zones,
-      AssessmentResult? result,
-      bool isLoading,
-      List<SafeCamp> adminCamps) {
+    LatLng currentLatLng,
+    List<app_zone.Zone> zones,
+    AssessmentResult? result,
+    bool isLoading,
+    List<SafeCamp> adminCamps,
+  ) {
     List<Marker> markers = [];
 
-    markers.add(Marker(
-      point: currentLatLng,
-      width: 40,
-      height: 40,
-      child: const Icon(Icons.my_location, color: Colors.blue, size: 40),
-    ));
+    markers.add(
+      Marker(
+        point: currentLatLng,
+        width: 40,
+        height: 40,
+        child: const Icon(Icons.my_location, color: Colors.blue, size: 40),
+      ),
+    );
 
     for (final camp in adminCamps) {
       markers.add(
@@ -653,12 +791,14 @@ class _MapTabState extends State<MapTab> {
         markerIcon = Icons.verified_user;
       }
 
-      markers.add(Marker(
-        point: LatLng(zone.latitude, zone.longitude),
-        width: 40,
-        height: 40,
-        child: Icon(markerIcon, color: markerColor, size: 40),
-      ));
+      markers.add(
+        Marker(
+          point: LatLng(zone.latitude, zone.longitude),
+          width: 40,
+          height: 40,
+          child: Icon(markerIcon, color: markerColor, size: 40),
+        ),
+      );
     }
 
     return markers;

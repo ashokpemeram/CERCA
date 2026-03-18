@@ -2,12 +2,14 @@
 class AssessmentResult {
   final String location;
   final String overallRisk; // "low", "medium", "high"
-  final String? alertMessage; // AI-generated message, present when risk >= medium
+  final String?
+  alertMessage; // AI-generated message, present when risk >= medium
   final String? safeMessage; // Present when area is safe
   final double? temperatureC;
   final String? weatherCondition;
   final double? windKph;
   final List<String> newsEvents;
+  final List<String> weatherIndicators;
   final String? weatherRiskLevel;
   final String? newsRiskLevel;
 
@@ -20,6 +22,7 @@ class AssessmentResult {
     this.weatherCondition,
     this.windKph,
     this.newsEvents = const [],
+    this.weatherIndicators = const [],
     this.weatherRiskLevel,
     this.newsRiskLevel,
   });
@@ -33,6 +36,7 @@ class AssessmentResult {
     String? weatherCondition;
     double? windKph;
     List<String> newsEvents = [];
+    List<String> weatherIndicators = [];
     String? weatherRiskLevel;
     String? newsRiskLevel;
 
@@ -49,6 +53,7 @@ class AssessmentResult {
           setCondition: (v) => weatherCondition = v,
           setWind: (v) => windKph = v,
           setEvents: (v) => newsEvents = v,
+          setIndicators: (v) => weatherIndicators = v,
           setWeatherRisk: (v) => weatherRiskLevel = v,
           setNewsRisk: (v) => newsRiskLevel = v,
         );
@@ -67,6 +72,7 @@ class AssessmentResult {
           setCondition: (v) => weatherCondition = v,
           setWind: (v) => windKph = v,
           setEvents: (v) => newsEvents = v,
+          setIndicators: (v) => weatherIndicators = v,
           setWeatherRisk: (v) => weatherRiskLevel = v,
           setNewsRisk: (v) => newsRiskLevel = v,
         );
@@ -82,6 +88,7 @@ class AssessmentResult {
       weatherCondition: weatherCondition,
       windKph: windKph,
       newsEvents: newsEvents,
+      weatherIndicators: weatherIndicators,
       weatherRiskLevel: weatherRiskLevel,
       newsRiskLevel: newsRiskLevel,
     );
@@ -93,12 +100,15 @@ class AssessmentResult {
     required void Function(String?) setCondition,
     required void Function(double?) setWind,
     required void Function(List<String>) setEvents,
+    required void Function(List<String>) setIndicators,
     required void Function(String?) setWeatherRisk,
     required void Function(String?) setNewsRisk,
   }) {
     final weather = risk['weather'] as Map<String, dynamic>?;
     if (weather != null) {
       setWeatherRisk(weather['risk_level'] as String?);
+      final indicators = weather['indicators'] as List<dynamic>?;
+      setIndicators(indicators?.cast<String>() ?? []);
       final rawData = weather['raw_data'] as Map<String, dynamic>?;
       final current = rawData?['current'] as Map<String, dynamic>?;
       if (current != null) {
@@ -114,5 +124,42 @@ class AssessmentResult {
       final events = news['events'] as List<dynamic>?;
       setEvents(events?.cast<String>() ?? []);
     }
+  }
+
+  String? get riskAspectSummary {
+    final parts = <String>[];
+
+    if (weatherRiskLevel != null && weatherRiskLevel != 'low') {
+      final indicators = weatherIndicators
+          .take(2)
+          .map(_formatIndicator)
+          .join(', ');
+      final weatherPart = indicators.isEmpty
+          ? 'Weather is ${weatherRiskLevel!.toUpperCase()}'
+          : 'Weather is ${weatherRiskLevel!.toUpperCase()} due to $indicators';
+      parts.add(weatherPart);
+    }
+
+    if (newsRiskLevel != null && newsRiskLevel != 'low') {
+      final events = newsEvents.take(2).join('; ');
+      final newsPart = events.isEmpty
+          ? 'News signals are ${newsRiskLevel!.toUpperCase()}'
+          : 'News signals are ${newsRiskLevel!.toUpperCase()} because of $events';
+      parts.add(newsPart);
+    }
+
+    if (parts.isEmpty) {
+      return null;
+    }
+
+    return parts.join(' | ');
+  }
+
+  static String _formatIndicator(String indicator) {
+    return indicator
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) => part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .join(' ');
   }
 }
